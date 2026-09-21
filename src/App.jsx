@@ -38,7 +38,7 @@ function POSApp() {
   }, []);
 
   return (
-    <div id="app-screen-root" className="min-h-screen flex flex-col bg-[#FAF8F5] text-stone-800 font-arabic select-none overflow-hidden">
+    <div id="app-screen-root" className="h-screen max-h-screen flex flex-col bg-[#FAF8F5] text-stone-800 font-arabic select-none overflow-hidden">
       {/* Top Header */}
       <Header
         activeTab={activeTab}
@@ -49,9 +49,9 @@ function POSApp() {
       {/* Main Workspace Area */}
       <main className="flex-1 flex overflow-hidden">
         {activeTab === 'pos' && (
-          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden h-full">
             {/* Products & Categories Section */}
-            <section className="flex-1 flex flex-col overflow-hidden">
+            <section className="flex-1 flex flex-col overflow-hidden h-full">
               <CategoryTabs
                 onOpenAddCategory={() => setIsAddCategoryOpen(true)}
               />

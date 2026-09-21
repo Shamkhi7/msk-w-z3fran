@@ -33,8 +33,9 @@ export function CategoryTabs({ onOpenAddCategory }) {
 
   return (
     <>
-      <div className="bg-white border-b border-warm-200 p-2.5 shadow-xs select-none">
-        <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-thin">
+      {/* Zero-Scroll Category Header: Compact Multi-Row Grid */}
+      <div className="bg-white border-b border-warm-200 p-2 select-none shadow-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-1.5 sm:gap-2">
           {categories.map((cat) => {
             const IconComponent = iconMap[cat.icon] || Tag;
             const isActive = activeCategory === cat.id;
@@ -43,18 +44,27 @@ export function CategoryTabs({ onOpenAddCategory }) {
             return (
               <button
                 key={cat.id}
+                type="button"
                 onClick={() => setActiveCategory(cat.id)}
-                className={`flex-shrink-0 px-5 py-3 rounded-xl text-sm font-bold flex items-center gap-2.5 transition-all cursor-pointer ${
+                className={`py-2 px-2.5 rounded-xl text-xs sm:text-[13px] font-bold flex items-center justify-between gap-1.5 transition-all cursor-pointer w-full text-right ${
                   isActive
-                    ? 'bg-brand-800 text-white shadow-md ring-2 ring-gold-500/40 translate-y-[-1px]'
-                    : 'bg-warm-50 text-stone-700 hover:bg-warm-100 border border-warm-200'
+                    ? 'bg-brand-800 text-white shadow-md ring-2 ring-gold-500/40 border border-brand-950 font-black'
+                    : 'bg-warm-50 text-stone-700 hover:bg-warm-100 hover:border-warm-300 border border-warm-200/90'
                 }`}
               >
-                <IconComponent className={`w-4 h-4 ${isActive ? 'text-gold-400' : 'text-brand-800'}`} />
-                <span className="whitespace-nowrap">{cat.name}</span>
+                <div className="flex items-center gap-1.5 min-w-0 truncate">
+                  <IconComponent
+                    className={`w-3.5 h-3.5 shrink-0 ${
+                      isActive ? 'text-gold-400' : 'text-brand-800'
+                    }`}
+                  />
+                  <span className="truncate">{cat.name}</span>
+                </div>
                 <span
-                  className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
-                    isActive ? 'bg-brand-950 text-gold-300' : 'bg-warm-200/80 text-stone-600'
+                  className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
+                    isActive
+                      ? 'bg-brand-950 text-gold-300'
+                      : 'bg-warm-200 text-stone-600'
                   }`}
                 >
                   {count}
@@ -63,14 +73,15 @@ export function CategoryTabs({ onOpenAddCategory }) {
             );
           })}
 
-          {/* Inline "+ إضافة قسم" Button */}
+          {/* "+ إضافة قسم" Button - As the last compact tile in the same grid */}
           <button
+            type="button"
             onClick={handleAddCategoryClick}
             title={isManager ? 'إضافة قسم جديد للقائمة' : 'إضافة قسم جديد (يتطلب موافقة المدير)'}
-            className="flex-shrink-0 px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-dashed border-amber-400 transition-colors cursor-pointer"
+            className="py-2 px-2.5 rounded-xl text-xs sm:text-[13px] font-bold flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-dashed border-amber-400 transition-colors cursor-pointer w-full"
           >
-            <Plus className="w-4 h-4 text-amber-800" />
-            <span className="whitespace-nowrap">+ إضافة قسم</span>
+            <Plus className="w-3.5 h-3.5 text-amber-800 shrink-0" />
+            <span className="truncate">+ إضافة قسم</span>
           </button>
         </div>
       </div>

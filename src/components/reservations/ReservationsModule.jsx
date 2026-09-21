@@ -10,9 +10,11 @@ import {
   Cake,
   PackageCheck,
   AlertCircle,
+  Calendar,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { ReservationFormModal } from './ReservationFormModal';
+import { formatPickupDateTime } from '../../utils/dateFormatter';
 
 export function ReservationsModule() {
   const {
@@ -193,10 +195,13 @@ export function ReservationsModule() {
                   </div>
 
                   {/* Pickup Time & Date */}
-                  <div className="bg-warm-100/70 p-2.5 rounded-xl border border-warm-200 text-xs text-stone-800 flex justify-between items-center">
-                    <span className="font-semibold">موعد الاستلام:</span>
-                    <span className="font-bold">
-                      {res.pickupDate} ({res.pickupTime})
+                  <div className="bg-warm-100/80 p-2.5 rounded-xl border border-warm-200 text-xs text-stone-800 flex justify-between items-center">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-brand-800" />
+                      <span>تاريخ ووقت الاستلام:</span>
+                    </span>
+                    <span className="font-mono font-black text-brand-900 text-xs dir-ltr bg-white px-2 py-0.5 rounded-lg border border-warm-200 shadow-xs">
+                      {formatPickupDateTime(res.pickupDate, res.pickupTime)}
                     </span>
                   </div>
 

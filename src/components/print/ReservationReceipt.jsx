@@ -1,8 +1,11 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
+import { formatPickupDateTime } from '../../utils/dateFormatter';
 
 export function ReservationReceipt({ reservation, storeSettings }) {
   if (!reservation) return null;
+
+  const formattedSchedule = formatPickupDateTime(reservation.pickupDate, reservation.pickupTime);
 
   return (
     <div className="receipt-container text-black bg-white select-none font-bold" style={{ color: '#000' }}>
@@ -30,11 +33,12 @@ export function ReservationReceipt({ reservation, storeSettings }) {
           <span className="font-black">رقم الهاتف:</span>
           <span className="font-mono font-black">{reservation.phone}</span>
         </div>
-        <div className="flex justify-between border-2 border-black p-1">
-          <span className="font-black">موعد الاستلام:</span>
-          <span className="font-black text-[11px]">
-            {reservation.pickupDate} ({reservation.pickupTime})
-          </span>
+        {/* Prominent Pickup Schedule: Date & Time Integrated */}
+        <div className="border-2 border-black p-1.5 text-center my-1 bg-white">
+          <div className="text-[10px] font-black text-black">تاريخ ووقت الاستلام:</div>
+          <div className="font-mono font-black text-xs text-black tracking-wide mt-0.5" dir="ltr">
+            {formattedSchedule}
+          </div>
         </div>
       </div>
 
@@ -99,7 +103,7 @@ export function ReservationReceipt({ reservation, storeSettings }) {
 
       {/* Footer Terms (Strictly concise, NO signatures) */}
       <div className="pt-2 text-center text-[9.5px] font-bold leading-tight text-black">
-        * يرجى إبراز هذا الوصل عند استلام الطلبية في الموعد المحدد.
+        * يرجى إبراز هذا الوصل عند استلام الطلبية في الموعد المحدد أعلاه.
         <br />* العربون غير قابل للاسترداد بعد البدء بتجهيز الكيك.
       </div>
     </div>

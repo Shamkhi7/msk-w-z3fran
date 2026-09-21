@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Check, Calendar, Clock, Cake, User, Phone, DollarSign, Type } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
+import { formatPickupDateTime } from '../../utils/dateFormatter';
 
 export function ReservationFormModal({ isOpen, onClose }) {
   const { addReservation, storeSettings } = usePOS();
@@ -119,31 +120,43 @@ export function ReservationFormModal({ isOpen, onClose }) {
           </div>
 
           {/* Delivery Date & Time */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-warm-100/60 p-3 rounded-xl border border-warm-200">
-            <div>
-              <label className="block text-xs font-bold text-stone-800 mb-1">
-                تاريخ الاستلام (Pickup Date):
-              </label>
-              <input
-                type="date"
-                value={pickupDate}
-                onChange={(e) => setPickupDate(e.target.value)}
-                className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-800"
-                required
-              />
+          <div className="space-y-2.5 bg-warm-100/70 p-3.5 rounded-2xl border border-warm-200">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-stone-800 mb-1 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-brand-800" />
+                  <span>تاريخ الاستلام (Pickup Date):</span>
+                </label>
+                <input
+                  type="date"
+                  value={pickupDate}
+                  onChange={(e) => setPickupDate(e.target.value)}
+                  className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-800 shadow-xs"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-800 mb-1 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-brand-800" />
+                  <span>وقت الاستلام (Pickup Time):</span>
+                </label>
+                <input
+                  type="time"
+                  value={pickupTime}
+                  onChange={(e) => setPickupTime(e.target.value)}
+                  className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-800 shadow-xs"
+                  required
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-stone-800 mb-1">
-                وقت الاستلام المتوقع:
-              </label>
-              <input
-                type="time"
-                value={pickupTime}
-                onChange={(e) => setPickupTime(e.target.value)}
-                className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-800"
-                required
-              />
+            {/* Live Integrated Pickup Schedule Preview */}
+            <div className="bg-white border border-brand-200 rounded-xl px-3 py-2 flex items-center justify-between shadow-xs">
+              <span className="text-[11px] font-bold text-stone-600">موعد وتوقيت الاستلام المعتمد:</span>
+              <span className="font-mono text-xs font-black text-brand-900 dir-ltr bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-100">
+                {formatPickupDateTime(pickupDate, pickupTime)}
+              </span>
             </div>
           </div>
 
