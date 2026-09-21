@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { X, Lock, KeyRound, AlertCircle, Check, Delete } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 
-export function ManagerPinModal({ isOpen, onClose, onSuccess }) {
+export function ManagerPinModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  title = 'رمز تأكيد المدير',
+  promptMessage = 'أدخل رمز تأكيد المدير للمتابعة',
+}) {
   const { storeSettings } = usePOS();
   const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -53,7 +59,7 @@ export function ManagerPinModal({ isOpen, onClose, onSuccess }) {
         <div className="bg-brand-900 text-white px-4 py-3 flex items-center justify-between border-b border-gold-500/30">
           <div className="flex items-center gap-2">
             <Lock className="w-4 h-4 text-gold-400" />
-            <h3 className="font-bold text-sm">رمز تأكيد المدير</h3>
+            <h3 className="font-bold text-sm">{title}</h3>
           </div>
           <button
             onClick={onClose}
@@ -66,7 +72,7 @@ export function ManagerPinModal({ isOpen, onClose, onSuccess }) {
         {/* Content */}
         <div className="p-4 text-center space-y-3">
           <div className="text-xs font-bold text-stone-700">
-            أدخل رمز تأكيد المدير لتصفير الصندوق وإغلاق الوردية
+            {promptMessage}
           </div>
 
           {/* PIN Dots display */}

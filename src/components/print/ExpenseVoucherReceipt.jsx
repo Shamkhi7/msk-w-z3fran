@@ -16,79 +16,65 @@ export function ExpenseVoucherReceipt({ expense, storeSettings }) {
   });
 
   return (
-    <div className="receipt-container text-black bg-white select-none">
+    <div className="receipt-container text-black bg-white select-none font-bold" style={{ color: '#000' }}>
       {/* Header */}
-      <div className="text-center pb-2 border-b border-dashed border-black">
-        <div className="text-sm font-black tracking-wide">{storeSettings.storeNameAr}</div>
-        <div className="text-[10px] font-semibold text-gray-700">{storeSettings.storeNameEn}</div>
-        <div className="text-xs font-black border border-black rounded px-3 py-0.5 mt-1.5 inline-block bg-gray-100">
+      <div className="text-center pb-2 border-b-2 border-black">
+        <div className="text-base font-black tracking-wide text-black">{storeSettings.storeNameAr}</div>
+        <div className="text-[11px] font-bold text-black">{storeSettings.storeNameEn}</div>
+        <div className="text-xs font-black border-2 border-black px-3 py-0.5 mt-1.5 inline-block">
           سند صرف نقدي (خزينة)
         </div>
       </div>
 
       {/* Meta */}
-      <div className="py-2 border-b border-dashed border-black space-y-1 text-[10px]">
+      <div className="py-2 border-b-2 border-black space-y-1 text-[10.5px] text-black">
         <div className="flex justify-between">
-          <span className="font-bold">رقم السند:</span>
-          <span className="font-mono font-bold">{expense.voucherNo}</span>
+          <span className="font-black">رقم السند:</span>
+          <span className="font-mono font-black">{expense.voucherNo}</span>
         </div>
-        <div className="flex justify-between text-[9px]">
+        <div className="flex justify-between text-[10px]">
           <span>التاريخ: {formattedDate}</span>
           <span>الوقت: {formattedTime}</span>
         </div>
-        <div className="flex justify-between text-[9.5px]">
+        <div className="flex justify-between text-[10px]">
           <span className="font-bold">التصنيف:</span>
-          <span className="font-semibold bg-gray-100 px-1 rounded border border-gray-300">
+          <span className="font-black border border-black px-1.5">
             {expense.category}
           </span>
         </div>
       </div>
 
       {/* Amount Box */}
-      <div className="py-2.5 border-b border-dashed border-black text-center">
-        <div className="text-[9px] text-gray-600 font-bold mb-0.5">المبلغ المصروف:</div>
-        <div className="text-base font-mono font-black border-2 border-black py-1 rounded inline-block px-4 bg-gray-50">
+      <div className="py-2.5 border-b-2 border-black text-center space-y-1 text-black">
+        <div className="text-[10px] font-black">المبلغ المصروف:</div>
+        <div className="text-xl font-mono font-black border-2 border-black py-1 px-4 inline-block">
           {Number(expense.amount).toLocaleString()} {storeSettings.currency}
         </div>
-        <div className="text-[9px] text-gray-800 italic mt-1 leading-snug">
+        <div className="text-[10px] font-bold italic leading-snug">
           {numberToArabicWords(Number(expense.amount), storeSettings.currency === 'د.ع' ? 'دينار عراقي' : storeSettings.currency)}
         </div>
       </div>
 
       {/* Details */}
-      <div className="py-2 border-b border-dashed border-black space-y-1.5 text-[10px]">
+      <div className="py-2 border-b-2 border-black space-y-2 text-[10.5px] text-black">
         <div>
-          <span className="font-bold text-gray-700 block">يصرف إلى السيد:</span>
-          <div className="font-black text-[11px] pr-1 mt-0.5 bg-gray-50 p-1 border border-dashed border-gray-300 rounded">
+          <span className="font-black block">يصرف إلى السيد:</span>
+          <div className="font-black text-xs pr-1 mt-0.5 border border-black p-1">
             {expense.recipient || 'غير محدد'}
           </div>
         </div>
 
         <div>
-          <span className="font-bold text-gray-700 block">وذلك لقاء (البيان / السبب):</span>
-          <div className="font-medium text-[9.5px] pr-1 mt-0.5 leading-relaxed">
+          <span className="font-black block">البيان / السبب:</span>
+          <div className="font-bold text-[10px] pr-1 mt-0.5 leading-relaxed">
             {expense.description}
           </div>
         </div>
       </div>
 
-      {/* Signatures */}
-      <div className="pt-3 space-y-4">
-        <div className="flex justify-between text-[9px]">
-          <div className="text-center">
-            <div>أمين الصندوق:</div>
-            <div className="font-bold mt-1">{expense.recordedBy || storeSettings.cashierName}</div>
-            <div className="mt-4">....................</div>
-          </div>
-          <div className="text-center">
-            <div>توقيع المستلم:</div>
-            <div className="font-bold mt-1">{expense.recipient || 'المستلم'}</div>
-            <div className="mt-4">....................</div>
-          </div>
-        </div>
-        <div className="text-[7.5px] text-center text-gray-500 font-mono border-t border-dotted border-gray-300 pt-1">
-          سند صرف رسمي مسجل في الأرشيف الدائم
-        </div>
+      {/* Footer without signatures */}
+      <div className="pt-2 text-center text-[9px] font-bold text-black font-mono">
+        سند صرف رسمي مسجل بالنظام • مسك وزعفران
       </div>
     </div>
   );

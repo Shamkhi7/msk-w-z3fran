@@ -11,8 +11,13 @@ import {
   Minimize,
   Clock,
   Sparkles,
+  Printer,
+  Shield,
+  ShieldCheck,
+  UserCheck,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
+import { RoleSwitchModal } from './RoleSwitchModal';
 
 export function Header({ activeTab, setActiveTab, onOpenSettings }) {
   const {
@@ -21,10 +26,15 @@ export function Header({ activeTab, setActiveTab, onOpenSettings }) {
     dailyTreasury,
     reservations,
     cartSummary,
+    printXReport,
+    userRole,
+    activeCashier,
+    isManager,
   } = usePOS();
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -141,8 +151,43 @@ export function Header({ activeTab, setActiveTab, onOpenSettings }) {
           })}
         </nav>
 
-        {/* Right Tools: Drawer Quick Net, Clock, Volume, Settings */}
-        <div className="flex items-center gap-2">
+        {/* Right Tools: Quick X-Report, Role Switcher, Drawer Net, Audio, Settings */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Quick Action: "طباعة مبيعات اليوم" (Shift X-Report) */}
+          <button
+            onClick={printXReport}
+            title="طباعة تقرير مبيعات اليوم الفوري (X-Report دون تصفير الصندوق)"
+            className="bg-gold-500 hover:bg-gold-400 active:scale-95 text-stone-950 font-black text-xs px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer border border-gold-400"
+          >
+            <Printer className="w-3.5 h-3.5 text-stone-950" />
+            <span className="hidden sm:inline">طباعة مبيعات اليوم</span>
+            <span className="sm:hidden inline">مبيعات اليوم</span>
+          </button>
+
+          {/* User Role / Cashier Switcher */}
+          <button
+            onClick={() => setIsRoleModalOpen(true)}
+            title="تبديل حساب الكاشير أو الترقية لوضع المدير"
+            className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              isManager
+                ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/80 shadow-xs'
+                : 'bg-brand-950/80 border-gold-500/40 text-gold-300 hover:bg-brand-950 shadow-xs'
+            }`}
+          >
+            {isManager ? (
+              <>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="hidden md:inline">المدير العام</span>
+                <span className="md:hidden inline">المدير</span>
+              </>
+            ) : (
+              <>
+                <UserCheck className="w-3.5 h-3.5 text-gold-400 shrink-0" />
+                <span>{activeCashier || 'كاشير'}</span>
+              </>
+            )}
+          </button>
+
           {/* Quick Drawer Net Indicator */}
           <div
             onClick={() => setActiveTab('treasury')}
@@ -215,6 +260,12 @@ export function Header({ activeTab, setActiveTab, onOpenSettings }) {
           </button>
         </div>
       </div>
+
+      {/* Role Switching Modal */}
+      <RoleSwitchModal
+        isOpen={isRoleModalOpen}
+        onClose={() => setIsRoleModalOpen(false)}
+      />
     </header>
   );
 }

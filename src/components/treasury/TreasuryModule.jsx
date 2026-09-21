@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Wallet,
   Receipt,
@@ -10,6 +10,11 @@ import {
   ShieldCheck,
   CheckCircle,
   Lock,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  Filter,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { ManagerPinModal } from './ManagerPinModal';
@@ -20,6 +25,8 @@ export function TreasuryModule() {
     dailyTreasury,
     currentSession,
     zReportsHistory,
+    shiftHistory,
+    reprintShiftZReport,
     triggerPrint,
     storeSettings,
   } = usePOS();
@@ -28,6 +35,12 @@ export function TreasuryModule() {
   const [isZModalOpen, setIsZModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('summary'); // summary, today_sales, today_expenses, today_returns, past_zreports
   const [successNotice, setSuccessNotice] = useState('');
+
+  // Shift Archive Filters
+  const [archiveFilter, setArchiveFilter] = useState('all'); // 'all' | 'today' | 'week' | 'month' | 'custom'
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [expandedShiftId, setExpandedShiftId] = useState(null);
 
   const {
     directSales,
@@ -43,6 +56,94 @@ export function TreasuryModule() {
     expensesCount,
     returnsCount,
   } = dailyTreasury;
+
+  // Unify shift records from shiftHistory or zReportsHistory
+  const combinedShifts = useMemo(() => {
+    if (shiftHistory && shiftHistory.length > 0) {
+      return shiftHistory;
+    }
+    return (zReportsHistory || []).map((rep) => ({
+      id: rep.id,
+      shiftNo: rep.reportNo,
+      sessionId: rep.sessionId,
+      openedAt: rep.openedAt,
+      closedAt: rep.closedAt,
+      closedBy: rep.closedBy,
+      directSales: rep.directSales,
+      salesReturns: rep.salesReturns,
+      netDirectSales: (rep.directSales || 0) - (rep.salesReturns || 0),
+      collectedDeposits: rep.collectedDeposits,
+      dailyExpenses: rep.dailyExpenses,
+      netCash: rep.netCash,
+      salesCount: rep.salesCount,
+      expensesCount: rep.expensesCount,
+      returnsCount: rep.returnsCount,
+      notes: rep.notes,
+      itemizedItems: [],
+    }));
+  }, [shiftHistory, zReportsHistory]);
+
+  // Filtered shifts based on date selector
+  const filteredShifts = useMemo(() => {
+    const now = new Date();
+    return combinedShifts.filter((shift) => {
+      const dateStr = shift.closedAt || shift.openedAt;
+      if (!dateStr) return true;
+      const shiftDate = new Date(dateStr);
+      if (isNaN(shiftDate.getTime())) return true;
+
+      if (archiveFilter === 'today') {
+        const todayStr = now.toISOString().split('T')[0];
+        const shiftStr = shiftDate.toISOString().split('T')[0];
+        return todayStr === shiftStr;
+      }
+      if (archiveFilter === 'week') {
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return shiftDate >= sevenDaysAgo;
+      }
+      if (archiveFilter === 'month') {
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        return shiftDate >= thirtyDaysAgo;
+      }
+      if (archiveFilter === 'custom') {
+        if (customStartDate) {
+          const start = new Date(customStartDate + 'T00:00:00');
+          if (shiftDate < start) return false;
+        }
+        if (customEndDate) {
+          const end = new Date(customEndDate + 'T23:59:59');
+          if (shiftDate > end) return false;
+        }
+        return true;
+      }
+      return true;
+    });
+  }, [combinedShifts, archiveFilter, customStartDate, customEndDate]);
+
+  // Aggregated totals for the selected period
+  const aggregatedPeriodTotals = useMemo(() => {
+    return filteredShifts.reduce(
+      (acc, s) => {
+        acc.totalSales += Number(s.directSales) || 0;
+        acc.totalReturns += Number(s.salesReturns) || 0;
+        acc.totalDeposits += Number(s.collectedDeposits) || 0;
+        acc.totalExpenses += Number(s.dailyExpenses) || 0;
+        acc.netCash += Number(s.netCash) || 0;
+        acc.salesCount += Number(s.salesCount) || 0;
+        acc.expensesCount += Number(s.expensesCount) || 0;
+        return acc;
+      },
+      {
+        totalSales: 0,
+        totalReturns: 0,
+        totalDeposits: 0,
+        totalExpenses: 0,
+        netCash: 0,
+        salesCount: 0,
+        expensesCount: 0,
+      }
+    );
+  }, [filteredShifts]);
 
   const handlePinSuccess = () => {
     // Open the Z report confirmation summary
@@ -194,7 +295,7 @@ export function TreasuryModule() {
           { id: 'today_sales', label: `فواتير المبيعات (${salesCount})` },
           { id: 'today_returns', label: `مردودات المبيعات (${returnsCount})` },
           { id: 'today_expenses', label: `سندات الصرف (${expensesCount})` },
-          { id: 'past_zreports', label: `أرشيف إغلاقات Z (${zReportsHistory.length})` },
+          { id: 'past_zreports', label: `أرشيف اليوميات والتقارير (${combinedShifts.length})` },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -448,73 +549,228 @@ export function TreasuryModule() {
           </div>
         )}
 
-        {/* TAB 5: Past Z-Reports History */}
+        {/* TAB 5: Comprehensive Shift History & Aggregated Reports */}
         {activeTab === 'past_zreports' && (
-          <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-xs">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-warm-100 font-bold text-stone-700 border-b border-warm-200">
-                <tr>
-                  <th className="py-2.5 px-3">رقم تقرير Z</th>
-                  <th className="py-2.5 px-3">وقت الإغلاق</th>
-                  <th className="py-2.5 px-3">المبيعات</th>
-                  <th className="py-2.5 px-3">المردود</th>
-                  <th className="py-2.5 px-3">العربون</th>
-                  <th className="py-2.5 px-3">الصرفيات</th>
-                  <th className="py-2.5 px-3">صافي الصندوق</th>
-                  <th className="py-2.5 px-3">المسؤول</th>
-                  <th className="py-2.5 px-3 text-center">إعادة طباعة Z</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-warm-100">
-                {zReportsHistory.length === 0 ? (
+          <div className="space-y-4">
+            {/* Filter Toolbar */}
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-warm-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-stone-600 flex items-center gap-1.5 ml-1">
+                  <Filter className="w-3.5 h-3.5 text-brand-800" />
+                  <span>تصفية الفترة:</span>
+                </span>
+                {[
+                  { id: 'all', label: 'الكل' },
+                  { id: 'today', label: 'اليوم' },
+                  { id: 'week', label: 'هذا الأسبوع' },
+                  { id: 'month', label: 'هذا الشهر' },
+                  { id: 'custom', label: 'فترة مخصصة' },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setArchiveFilter(f.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      archiveFilter === f.id
+                        ? 'bg-brand-800 text-white shadow-xs'
+                        : 'bg-warm-50 text-stone-700 hover:bg-warm-100 border border-warm-200'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Date Inputs if 'custom' is active */}
+              {archiveFilter === 'custom' && (
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-1">
+                    <span className="text-stone-500 font-bold">من:</span>
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="bg-warm-50 border border-stone-300 rounded-lg px-2 py-1 text-xs font-mono font-bold"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-stone-500 font-bold">إلى:</span>
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="bg-warm-50 border border-stone-300 rounded-lg px-2 py-1 text-xs font-mono font-bold"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Aggregated Period KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+              <div className="bg-white p-3 rounded-xl border border-warm-200 shadow-xs text-right">
+                <span className="text-[11px] font-bold text-stone-500 block">إجمالي مبيعات الفترة:</span>
+                <span className="text-base sm:text-lg font-mono font-black text-brand-900">
+                  {aggregatedPeriodTotals.totalSales.toLocaleString()} {storeSettings.currency}
+                </span>
+                <span className="block text-[10px] text-stone-400 mt-0.5 font-mono">
+                  {aggregatedPeriodTotals.salesCount} فاتورة
+                </span>
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-warm-200 shadow-xs text-right">
+                <span className="text-[11px] font-bold text-stone-500 block">إجمالي المردودات:</span>
+                <span className="text-base sm:text-lg font-mono font-black text-rose-700">
+                  -{aggregatedPeriodTotals.totalReturns.toLocaleString()} {storeSettings.currency}
+                </span>
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-warm-200 shadow-xs text-right">
+                <span className="text-[11px] font-bold text-stone-500 block">إجمالي العربونات:</span>
+                <span className="text-base sm:text-lg font-mono font-black text-emerald-700">
+                  +{aggregatedPeriodTotals.totalDeposits.toLocaleString()} {storeSettings.currency}
+                </span>
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-warm-200 shadow-xs text-right">
+                <span className="text-[11px] font-bold text-stone-500 block">إجمالي الصرفيات:</span>
+                <span className="text-base sm:text-lg font-mono font-black text-rose-700">
+                  -{aggregatedPeriodTotals.totalExpenses.toLocaleString()} {storeSettings.currency}
+                </span>
+                <span className="block text-[10px] text-stone-400 mt-0.5 font-mono">
+                  {aggregatedPeriodTotals.expensesCount} سند
+                </span>
+              </div>
+
+              <div className="bg-brand-900 text-white p-3 rounded-xl border border-gold-500/40 shadow-xs text-right col-span-2 sm:col-span-1">
+                <span className="text-[11px] font-bold text-gold-300 block">صافي النقد التراكمي:</span>
+                <span className="text-base sm:text-lg font-mono font-black text-white">
+                  {aggregatedPeriodTotals.netCash.toLocaleString()} {storeSettings.currency}
+                </span>
+                <span className="block text-[10px] text-warm-200 mt-0.5">
+                  ({filteredShifts.length} وردية مغلقة)
+                </span>
+              </div>
+            </div>
+
+            {/* Shifts Archive Table */}
+            <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-xs">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-warm-100 font-bold text-stone-700 border-b border-warm-200">
                   <tr>
-                    <td colSpan="9" className="py-8 text-center text-stone-400 font-bold">
-                      لا توجد إغلاقات Z مؤرشفة بعد. سيتم أرشفة أول تقرير عند تصفير الصندوق.
-                    </td>
+                    <th className="py-2.5 px-3">رقم الوردية / Z</th>
+                    <th className="py-2.5 px-3">وقت الإغلاق</th>
+                    <th className="py-2.5 px-3">المبيعات</th>
+                    <th className="py-2.5 px-3">المردود</th>
+                    <th className="py-2.5 px-3">العربون</th>
+                    <th className="py-2.5 px-3">الصرفيات</th>
+                    <th className="py-2.5 px-3">صافي الصندوق</th>
+                    <th className="py-2.5 px-3">المسؤول</th>
+                    <th className="py-2.5 px-3 text-center">التفاصيل / طباعة</th>
                   </tr>
-                ) : (
-                  zReportsHistory.map((rep) => (
-                    <tr key={rep.id} className="hover:bg-warm-50/60">
-                      <td className="py-2.5 px-3 font-mono font-bold text-brand-900">
-                        {rep.reportNo}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-stone-600">
-                        {new Date(rep.closedAt).toLocaleDateString('ar-IQ')}{' '}
-                        {new Date(rep.closedAt).toLocaleTimeString('ar-IQ', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono font-bold">
-                        {(rep.directSales || 0).toLocaleString()} {storeSettings.currency}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-rose-700 font-bold">
-                        {(rep.salesReturns || 0) > 0 ? `-${(rep.salesReturns || 0).toLocaleString()} ${storeSettings.currency}` : '-'}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-emerald-700 font-bold">
-                        +{(rep.collectedDeposits || 0).toLocaleString()} {storeSettings.currency}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-rose-700 font-bold">
-                        -{(rep.dailyExpenses || 0).toLocaleString()} {storeSettings.currency}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono font-black text-brand-900 text-sm">
-                        {(rep.netCash || 0).toLocaleString()} {storeSettings.currency}
-                      </td>
-                      <td className="py-2.5 px-3 text-stone-700">{rep.closedBy}</td>
-                      <td className="py-2.5 px-3 text-center">
-                        <button
-                          onClick={() => triggerPrint('zreport', rep)}
-                          title="إعادة طباعة تقرير Z"
-                          className="p-1.5 hover:bg-brand-50 text-stone-600 hover:text-brand-800 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <Printer className="w-4 h-4" />
-                        </button>
+                </thead>
+                <tbody className="divide-y divide-warm-100">
+                  {filteredShifts.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" className="py-8 text-center text-stone-400 font-bold">
+                        لا توجد إغلاقات ورديات تطابق الفترة المحددة
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredShifts.map((rep) => {
+                      const isExpanded = expandedShiftId === rep.id;
+                      const hasItems = rep.itemizedItems && rep.itemizedItems.length > 0;
+
+                      return (
+                        <React.Fragment key={rep.id}>
+                          <tr className="hover:bg-warm-50/60">
+                            <td className="py-2.5 px-3 font-mono font-bold text-brand-900">
+                              {rep.shiftNo || rep.reportNo}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-stone-600">
+                              {new Date(rep.closedAt).toLocaleDateString('ar-IQ')}{' '}
+                              {new Date(rep.closedAt).toLocaleTimeString('ar-IQ', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono font-bold">
+                              {(rep.directSales || 0).toLocaleString()} {storeSettings.currency}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-rose-700 font-bold">
+                              {(rep.salesReturns || 0) > 0
+                                ? `-${(rep.salesReturns || 0).toLocaleString()} ${storeSettings.currency}`
+                                : '-'}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-emerald-700 font-bold">
+                              +{(rep.collectedDeposits || 0).toLocaleString()} {storeSettings.currency}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-rose-700 font-bold">
+                              -{(rep.dailyExpenses || 0).toLocaleString()} {storeSettings.currency}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono font-black text-brand-900 text-sm">
+                              {(rep.netCash || 0).toLocaleString()} {storeSettings.currency}
+                            </td>
+                            <td className="py-2.5 px-3 text-stone-700">{rep.closedBy}</td>
+                            <td className="py-2.5 px-3 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                {hasItems && (
+                                  <button
+                                    onClick={() => setExpandedShiftId(isExpanded ? null : rep.id)}
+                                    title="عرض الأصناف المباعة في هذه الوردية"
+                                    className="p-1.5 hover:bg-stone-100 text-stone-600 rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronUp className="w-4 h-4 text-brand-800" />
+                                    ) : (
+                                      <ChevronDown className="w-4 h-4 text-stone-500" />
+                                    )}
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => reprintShiftZReport(rep)}
+                                  title="إعادة طباعة تقرير Z"
+                                  className="p-1.5 hover:bg-brand-50 text-stone-600 hover:text-brand-800 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                >
+                                  <Printer className="w-4 h-4 text-brand-800" />
+                                  <span className="hidden xl:inline text-[10px] font-bold">طباعة Z</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Expandable itemized sold items breakdown */}
+                          {isExpanded && hasItems && (
+                            <tr className="bg-amber-50/40">
+                              <td colSpan="9" className="p-3">
+                                <div className="border border-amber-200 rounded-xl p-3 bg-white">
+                                  <div className="text-xs font-bold text-stone-800 mb-2 flex items-center gap-1.5">
+                                    <FileText className="w-3.5 h-3.5 text-brand-800" />
+                                    <span>الأصناف المباعة في هذه الوردية ({rep.itemizedItems.length} صنف):</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 text-[11px]">
+                                    {rep.itemizedItems.map((it, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="p-2 bg-stone-50 rounded-lg border border-stone-200 flex justify-between"
+                                      >
+                                        <span className="font-bold text-stone-800 truncate pr-1">{it.name}</span>
+                                        <span className="font-mono text-brand-900 font-bold shrink-0">
+                                          ×{it.quantity} ({Number(it.total).toLocaleString()})
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

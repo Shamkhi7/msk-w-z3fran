@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { PaymentModal } from './PaymentModal';
+import { ManagerPinModal } from '../treasury/ManagerPinModal';
 
 export function CartDrawer() {
   const {
@@ -21,17 +22,25 @@ export function CartDrawer() {
     applyCartItemDiscount,
     cartSummary,
     storeSettings,
+    isManager,
   } = usePOS();
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [activeOverrideItemId, setActiveOverrideItemId] = useState(null);
   const [customPriceInput, setCustomPriceInput] = useState('');
   const [customDiscountInput, setCustomDiscountInput] = useState('');
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pendingOverrideItem, setPendingOverrideItem] = useState(null);
 
   const openOverrideDialog = (item) => {
-    setActiveOverrideItemId(item.cartItemId);
-    setCustomPriceInput(String(item.unitPrice));
-    setCustomDiscountInput(item.discount > 0 ? String(item.discount) : '');
+    if (isManager) {
+      setActiveOverrideItemId(item.cartItemId);
+      setCustomPriceInput(String(item.unitPrice));
+      setCustomDiscountInput(item.discount > 0 ? String(item.discount) : '');
+    } else {
+      setPendingOverrideItem(item);
+      setIsPinModalOpen(true);
+    }
   };
 
   const saveOverride = (cartItemId) => {
@@ -290,6 +299,26 @@ export function CartDrawer() {
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
+      />
+
+      {/* Manager PIN Verification for Cart Discount / Override */}
+      <ManagerPinModal
+        isOpen={isPinModalOpen}
+        onClose={() => {
+          setIsPinModalOpen(false);
+          setPendingOverrideItem(null);
+        }}
+        onSuccess={() => {
+          setIsPinModalOpen(false);
+          if (pendingOverrideItem) {
+            setActiveOverrideItemId(pendingOverrideItem.cartItemId);
+            setCustomPriceInput(String(pendingOverrideItem.unitPrice));
+            setCustomDiscountInput(pendingOverrideItem.discount > 0 ? String(pendingOverrideItem.discount) : '');
+          }
+          setPendingOverrideItem(null);
+        }}
+        title="صلاحيات المدير - تعديل سعر / خصم"
+        promptMessage="تعديل الأسعار والخصومات محصور بالإدارة. أدخل رمز تأكيد المدير للمتابعة"
       />
     </aside>
   );

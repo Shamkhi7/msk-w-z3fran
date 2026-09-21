@@ -6,6 +6,7 @@ import { ExpenseVoucherReceipt } from './ExpenseVoucherReceipt';
 import { CombinedExpensesReceipt } from './CombinedExpensesReceipt';
 import { SalesReturnReceipt } from './SalesReturnReceipt';
 import { ZReportReceipt } from './ZReportReceipt';
+import { XReportReceipt } from './XReportReceipt';
 import { usePOS } from '../../context/POSContext';
 
 export function PrintPreviewModal() {
@@ -35,6 +36,8 @@ export function PrintPreviewModal() {
         return 'معاينة وصل مردود مبيعات';
       case 'zreport':
         return 'معاينة تقرير الإغلاق المالي (Z-Report)';
+      case 'xreport':
+        return 'معاينة مبيعات اليوم (X-Report)';
       default:
         return 'معاينة الطباعة';
     }
@@ -59,6 +62,8 @@ export function PrintPreviewModal() {
         return <SalesReturnReceipt returnData={printJob.data} storeSettings={storeSettings} />;
       case 'zreport':
         return <ZReportReceipt report={printJob.data} storeSettings={storeSettings} />;
+      case 'xreport':
+        return <XReportReceipt reportData={printJob.data} storeSettings={storeSettings} />;
       default:
         return null;
     }

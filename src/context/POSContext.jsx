@@ -54,10 +54,41 @@ export function POSProvider({ children }) {
   // Permanent Z-Reports Archive
   const [zReportsHistory, setZReportsHistory] = useLocalStorage('mz_zreports', []);
 
+  // Permanent Shift History Archive (Full records & itemized breakdown)
+  const [shiftHistory, setShiftHistory] = useLocalStorage('mz_shift_history', []);
+
+  // User Roles & Cashier Profiles
+  const [userRole, setUserRole] = useLocalStorage('mz_user_role', 'cashier'); // 'cashier' | 'manager'
+  const [activeCashier, setActiveCashier] = useLocalStorage('mz_active_cashier', 'كاشير 1');
+  const cashierProfiles = ['كاشير 1', 'كاشير 2'];
+
+  const isManager = userRole === 'manager';
+
+  const verifyManagerPin = (pin) => {
+    return String(pin || '').trim() === String(storeSettings.managerPin || '1234').trim();
+  };
+
+  const switchRole = (targetRole, pin = '') => {
+    if (targetRole === 'manager') {
+      if (verifyManagerPin(pin)) {
+        setUserRole('manager');
+        playSound('success');
+        return { success: true };
+      } else {
+        playSound('warning');
+        return { success: false, message: 'رمز مرور المدير غير صحيح' };
+      }
+    } else {
+      setUserRole('cashier');
+      playSound('add');
+      return { success: true };
+    }
+  };
+
   // 5. Thermal Printing State
   const [printJob, setPrintJob] = useState({
     isOpen: false,
-    type: null, // 'sale' | 'reservation' | 'expense' | 'combined_expenses' | 'sales_return' | 'zreport'
+    type: null, // 'sale' | 'reservation' | 'expense' | 'combined_expenses' | 'sales_return' | 'zreport' | 'xreport'
     data: null,
   });
 
@@ -269,7 +300,7 @@ export function POSProvider({ children }) {
       changeDue: Number(paymentData.changeDue) || 0,
       paymentMethod: paymentData.paymentMethod || 'نقداً',
       customerName: paymentData.customerName || 'زبون عام',
-      cashierName: storeSettings.cashierName,
+      cashierName: activeCashier || storeSettings.cashierName,
       date: new Date().toISOString(),
       notes: paymentData.notes || '',
     };
@@ -298,7 +329,7 @@ export function POSProvider({ children }) {
       originalReceiptNo: returnData.originalReceiptNo || '',
       reason: returnData.reason || 'إرجاع صنف ومسترجع نقدي',
       items: returnData.items || [],
-      cashierName: storeSettings.cashierName,
+      cashierName: activeCashier || storeSettings.cashierName,
       date: new Date().toISOString(),
     };
 
@@ -370,7 +401,7 @@ export function POSProvider({ children }) {
         changeDue: 0,
         paymentMethod: 'نقداً',
         customerName: reservationData.customerName,
-        cashierName: storeSettings.cashierName,
+        cashierName: activeCashier || storeSettings.cashierName,
         date: new Date().toISOString(),
         reservationId: newReservation.id,
         notes: `عربون حجز رقم ${receiptNumber}`,
@@ -419,7 +450,7 @@ export function POSProvider({ children }) {
         changeDue: 0,
         paymentMethod: 'نقداً',
         customerName: reservation.customerName,
-        cashierName: storeSettings.cashierName,
+        cashierName: activeCashier || storeSettings.cashierName,
         date: new Date().toISOString(),
         reservationId: reservation.id,
         notes: `تسليم طلب كيك واستلام المتبقي للحجز ${reservation.receiptNumber}`,
@@ -452,7 +483,7 @@ export function POSProvider({ children }) {
       recipient: expenseData.recipient || '',
       description: expenseData.description || '',
       date: expenseData.date || new Date().toISOString(),
-      recordedBy: storeSettings.cashierName,
+      recordedBy: activeCashier || storeSettings.cashierName,
     };
 
     setExpenses((prev) => [newExpense, ...prev]);
@@ -548,10 +579,79 @@ export function POSProvider({ children }) {
   }, [salesHistory, salesReturns, expenses, currentSession]);
 
   // ==========================================
+  // ITEM SALES AGGREGATION & SHIFT ACTIONS
+  // ==========================================
+  const getItemizedSales = (salesList) => {
+    const itemMap = {};
+    (salesList || []).forEach((sale) => {
+      (sale.items || []).forEach((item) => {
+        const key = item.product?.id || item.product?.name || item.name || 'item';
+        const name = item.product?.name || item.name || 'منتج';
+        const qty = Number(item.quantity) || 1;
+        const effectivePrice = Number(item.unitPrice) || Number(item.price) || 0;
+        const lineTotal = Math.max(0, (effectivePrice * qty) - (Number(item.discount) || 0));
+        if (!itemMap[key]) {
+          itemMap[key] = {
+            id: key,
+            name,
+            quantity: 0,
+            total: 0,
+          };
+        }
+        itemMap[key].quantity += qty;
+        itemMap[key].total += lineTotal;
+      });
+    });
+    return Object.values(itemMap);
+  };
+
+  // Quick Action (X-Report): Shift Sales Preview without clearing counters
+  const printXReport = () => {
+    const itemized = getItemizedSales(dailyTreasury.sessionSales);
+    const xReportData = {
+      cashierName: activeCashier || storeSettings.cashierName,
+      sessionId: currentSession.sessionId,
+      openedAt: currentSession.openedAt,
+      currentTime: new Date().toISOString(),
+      directSales: dailyTreasury.directSales,
+      salesReturns: dailyTreasury.salesReturnsTotal,
+      collectedDeposits: dailyTreasury.collectedDeposits,
+      dailyExpenses: dailyTreasury.dailyExpenses,
+      netCash: dailyTreasury.netCash,
+      salesCount: dailyTreasury.salesCount,
+      expensesCount: dailyTreasury.expensesCount,
+      returnsCount: dailyTreasury.returnsCount,
+      itemizedItems: itemized,
+    };
+    triggerPrint('xreport', xReportData);
+  };
+
+  // Reprint past shift Z-Report
+  const reprintShiftZReport = (shift) => {
+    triggerPrint('zreport', {
+      reportNo: shift.shiftNo || shift.reportNo || shift.id,
+      sessionId: shift.sessionId,
+      openedAt: shift.openedAt,
+      closedAt: shift.closedAt,
+      closedBy: shift.closedBy,
+      directSales: shift.directSales,
+      salesReturns: shift.salesReturns,
+      collectedDeposits: shift.collectedDeposits,
+      dailyExpenses: shift.dailyExpenses,
+      netCash: shift.netCash,
+      salesCount: shift.salesCount,
+      expensesCount: shift.expensesCount,
+      notes: shift.notes,
+    });
+  };
+
+  // ==========================================
   // END-OF-DAY RESET & Z-REPORT
   // ==========================================
   const closeDayAndResetDrawer = (closingNotes = '') => {
     const closingTime = new Date().toISOString();
+    const itemized = getItemizedSales(dailyTreasury.sessionSales);
+    const cashier = activeCashier || storeSettings.cashierName;
 
     const zReport = {
       id: 'Z-' + Date.now(),
@@ -559,7 +659,7 @@ export function POSProvider({ children }) {
       sessionId: currentSession.sessionId,
       openedAt: currentSession.openedAt,
       closedAt: closingTime,
-      closedBy: storeSettings.cashierName,
+      closedBy: cashier,
       directSales: dailyTreasury.directSales,
       salesReturns: dailyTreasury.salesReturnsTotal,
       collectedDeposits: dailyTreasury.collectedDeposits,
@@ -571,7 +671,28 @@ export function POSProvider({ children }) {
       notes: closingNotes,
     };
 
+    const shiftRecord = {
+      id: 'SHIFT-' + Date.now(),
+      shiftNo: zReport.reportNo,
+      sessionId: currentSession.sessionId,
+      openedAt: currentSession.openedAt,
+      closedAt: closingTime,
+      closedBy: cashier,
+      directSales: dailyTreasury.directSales,
+      salesReturns: dailyTreasury.salesReturnsTotal,
+      netDirectSales: dailyTreasury.netDirectSales,
+      collectedDeposits: dailyTreasury.collectedDeposits,
+      dailyExpenses: dailyTreasury.dailyExpenses,
+      netCash: dailyTreasury.netCash,
+      salesCount: dailyTreasury.salesCount,
+      expensesCount: dailyTreasury.expensesCount,
+      returnsCount: dailyTreasury.returnsCount,
+      notes: closingNotes,
+      itemizedItems: itemized,
+    };
+
     setZReportsHistory((prev) => [zReport, ...prev]);
+    setShiftHistory((prev) => [shiftRecord, ...prev]);
 
     // Automatically trigger printing of the Daily Z-Report
     triggerPrint('zreport', zReport);
@@ -640,6 +761,9 @@ export function POSProvider({ children }) {
       reservations,
       expenses,
       zReportsHistory,
+      shiftHistory,
+      userRole,
+      activeCashier,
       currentSession,
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], {
@@ -663,6 +787,9 @@ export function POSProvider({ children }) {
       if (jsonData.reservations) setReservations(jsonData.reservations);
       if (jsonData.expenses) setExpenses(jsonData.expenses);
       if (jsonData.zReportsHistory) setZReportsHistory(jsonData.zReportsHistory);
+      if (jsonData.shiftHistory) setShiftHistory(jsonData.shiftHistory);
+      if (jsonData.userRole) setUserRole(jsonData.userRole);
+      if (jsonData.activeCashier) setActiveCashier(jsonData.activeCashier);
       if (jsonData.currentSession) setCurrentSession(jsonData.currentSession);
       playSound('success');
       return true;
@@ -680,6 +807,9 @@ export function POSProvider({ children }) {
     setExpenses(INITIAL_EXPENSES);
     setSalesHistory([]);
     setSalesReturns([]);
+    setShiftHistory([]);
+    setUserRole('cashier');
+    setActiveCashier('كاشير 1');
     setCart([]);
     setCurrentSession({
       sessionId: 'SESSION-' + Date.now(),
@@ -694,6 +824,16 @@ export function POSProvider({ children }) {
     storeSettings,
     setStoreSettings,
     updateManagerPin,
+
+    // User Roles & Cashier Profiles
+    userRole,
+    setUserRole,
+    activeCashier,
+    setActiveCashier,
+    cashierProfiles,
+    isManager,
+    verifyManagerPin,
+    switchRole,
 
     // Catalog
     categories: cleanCategories,
@@ -739,11 +879,15 @@ export function POSProvider({ children }) {
     deleteExpense,
     printCombinedExpenses,
 
-    // Treasury & Z-Report
+    // Treasury, Shifts & Z-Report
     currentSession,
     dailyTreasury,
     closeDayAndResetDrawer,
     zReportsHistory,
+    shiftHistory,
+    setShiftHistory,
+    printXReport,
+    reprintShiftZReport,
 
     // Printing
     printJob,

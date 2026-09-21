@@ -4,6 +4,7 @@ import { usePOS } from '../../context/POSContext';
 import { ProductEditModal } from './ProductEditModal';
 import { ServiceItemModal } from './ServiceItemModal';
 import { SalesReturnModal } from './SalesReturnModal';
+import { ManagerPinModal } from '../treasury/ManagerPinModal';
 
 export function ProductGrid({ onOpenAddProduct }) {
   const {
@@ -13,12 +14,15 @@ export function ProductGrid({ onOpenAddProduct }) {
     setSearchQuery,
     addToCart,
     storeSettings,
+    isManager,
   } = usePOS();
 
   const [editingProduct, setEditingProduct] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [serviceModalType, setServiceModalType] = useState(null); // 'deposit' | 'remaining' | null
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   const longPressTimerRef = useRef(null);
 
@@ -47,16 +51,33 @@ export function ProductGrid({ onOpenAddProduct }) {
     addToCart(product);
   };
 
+  const handleAddProductClick = () => {
+    if (isManager) {
+      onOpenAddProduct();
+    } else {
+      setPendingAction({ type: 'add' });
+      setIsPinModalOpen(true);
+    }
+  };
+
+  const handleEditProductClick = (product) => {
+    if (isManager) {
+      setEditingProduct(product);
+      setIsEditModalOpen(true);
+    } else {
+      setPendingAction({ type: 'edit', product });
+      setIsPinModalOpen(true);
+    }
+  };
+
   const handleContextMenu = (e, product) => {
     e.preventDefault();
-    setEditingProduct(product);
-    setIsEditModalOpen(true);
+    handleEditProductClick(product);
   };
 
   const handleTouchStart = (product) => {
     longPressTimerRef.current = setTimeout(() => {
-      setEditingProduct(product);
-      setIsEditModalOpen(true);
+      handleEditProductClick(product);
     }, 600);
   };
 
@@ -124,9 +145,10 @@ export function ProductGrid({ onOpenAddProduct }) {
       {/* Grid Content */}
       <div className="flex-1 p-3 sm:p-4 overflow-y-auto">
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-3 sm:gap-4">
-          {/* Add Product Inline Card (enlarged) */}
+          {/* Add Product Inline Card */}
           <button
-            onClick={onOpenAddProduct}
+            onClick={handleAddProductClick}
+            title={isManager ? 'إضافة منتج جديد' : 'إضافة منتج جديد (يتطلب موافقة المدير)'}
             className="group min-h-[140px] p-4 rounded-2xl border-2 border-dashed border-brand-800/40 hover:border-brand-800 bg-white hover:bg-brand-50/40 flex flex-col items-center justify-center gap-2 text-brand-900 transition-all cursor-pointer shadow-xs active:scale-98"
           >
             <div className="w-12 h-12 rounded-full bg-brand-100 group-hover:bg-brand-800 group-hover:text-white text-brand-800 flex items-center justify-center transition-colors shadow-xs">
@@ -136,7 +158,7 @@ export function ProductGrid({ onOpenAddProduct }) {
             <span className="text-xs text-stone-500">لهذا القسم</span>
           </button>
 
-          {/* Product Items (Enlarged & Clean Classic Look) */}
+          {/* Product Items */}
           {filteredProducts.map((product) => {
             const isService = product.isService;
             const isAvailable = product.isAvailable;
@@ -166,10 +188,9 @@ export function ProductGrid({ onOpenAddProduct }) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setEditingProduct(product);
-                      setIsEditModalOpen(true);
+                      handleEditProductClick(product);
                     }}
-                    title="تعديل سريع"
+                    title={isManager ? 'تعديل الصنف' : 'تعديل الصنف (يتطلب موافقة المدير)'}
                     className="p-1.5 rounded-lg text-stone-400 hover:text-brand-800 hover:bg-stone-100 transition-colors"
                   >
                     <MoreVertical className="w-4 h-4" />
@@ -217,7 +238,7 @@ export function ProductGrid({ onOpenAddProduct }) {
           <div className="p-12 text-center text-stone-500">
             <p className="font-bold text-sm">لا توجد منتجات مضافة في هذا القسم حتى الآن</p>
             <button
-              onClick={onOpenAddProduct}
+              onClick={handleAddProductClick}
               className="mt-3 px-5 py-2.5 bg-brand-800 text-white rounded-xl text-xs font-bold hover:bg-brand-900 cursor-pointer"
             >
               + إضافة أول منتج في هذا القسم
@@ -247,6 +268,27 @@ export function ProductGrid({ onOpenAddProduct }) {
       <SalesReturnModal
         isOpen={isReturnModalOpen}
         onClose={() => setIsReturnModalOpen(false)}
+      />
+
+      {/* Manager PIN Protection Modal */}
+      <ManagerPinModal
+        isOpen={isPinModalOpen}
+        onClose={() => {
+          setIsPinModalOpen(false);
+          setPendingAction(null);
+        }}
+        onSuccess={() => {
+          setIsPinModalOpen(false);
+          if (pendingAction?.type === 'add') {
+            onOpenAddProduct();
+          } else if (pendingAction?.type === 'edit') {
+            setEditingProduct(pendingAction.product);
+            setIsEditModalOpen(true);
+          }
+          setPendingAction(null);
+        }}
+        title="صلاحيات المدير - إدارة المنتجات"
+        promptMessage="أدخل رمز تأكيد المدير للتمكن من إضافة أو تعديل المنتجات والأسعار"
       />
     </div>
   );
