@@ -1,19 +1,18 @@
 import React, { useState } from 'react';
 import {
   Wallet,
-  TrendingUp,
   Receipt,
   RotateCcw,
   Printer,
   History,
-  CheckCircle2,
-  Calendar,
-  Layers,
   ArrowDownLeft,
   ArrowUpRight,
   ShieldCheck,
+  CheckCircle,
+  Lock,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
+import { ManagerPinModal } from './ManagerPinModal';
 import { ZReportConfirmationModal } from './ZReportConfirmationModal';
 
 export function TreasuryModule() {
@@ -25,21 +24,30 @@ export function TreasuryModule() {
     storeSettings,
   } = usePOS();
 
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isZModalOpen, setIsZModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('summary'); // summary, today_sales, today_expenses, past_zreports
+  const [activeTab, setActiveTab] = useState('summary'); // summary, today_sales, today_expenses, today_returns, past_zreports
+  const [successNotice, setSuccessNotice] = useState('');
 
   const {
     directSales,
+    salesReturnsTotal,
+    netDirectSales,
     collectedDeposits,
     dailyExpenses,
     netCash,
     sessionSales,
     sessionExpenses,
+    sessionReturns,
     salesCount,
     expensesCount,
+    returnsCount,
   } = dailyTreasury;
 
-  const totalInflows = directSales + collectedDeposits;
+  const handlePinSuccess = () => {
+    // Open the Z report confirmation summary
+    setIsZModalOpen(true);
+  };
 
   return (
     <div className="flex flex-col h-full bg-[#FAF8F5] overflow-hidden select-none">
@@ -63,18 +71,18 @@ export function TreasuryModule() {
           </div>
         </div>
 
-        {/* Prominent "إغلاق اليومية وتصفير الصندوق" Button */}
+        {/* Manager PIN Protected "إغلاق اليومية وتصفير الصندوق" Button */}
         <button
-          onClick={() => setIsZModalOpen(true)}
+          onClick={() => setIsPinModalOpen(true)}
           className="bg-brand-800 hover:bg-brand-900 text-white font-black px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-brand-900/20 hover:shadow-xl transition-all cursor-pointer active:scale-98 border border-gold-500/30"
         >
-          <RotateCcw className="w-4 h-4 text-gold-400" />
-          <span>إغلاق اليومية وتصفير الصندوق</span>
+          <Lock className="w-4 h-4 text-gold-400" />
+          <span>إغلاق اليومية وتصفير الصندوق (محمي بالرمز)</span>
         </button>
       </div>
 
       {/* Dynamic Financial KPI Cards */}
-      <div className="p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {/* 1. Total Direct Sales Revenue */}
         <div className="bg-white p-3.5 rounded-2xl border border-warm-200 shadow-xs hover:border-brand-700/30 transition-all flex flex-col justify-between">
           <div className="flex items-center justify-between">
@@ -91,17 +99,38 @@ export function TreasuryModule() {
               </span>
             </div>
             <div className="text-[10px] text-stone-400 mt-0.5">
-              من {salesCount} عملية بيع نشطة اليوم
+              من {salesCount} عملية بيع
             </div>
           </div>
         </div>
 
-        {/* 2. Total Collected Deposits (itemized from عربون حجز) */}
+        {/* 2. Sales Returns / Refunds */}
+        <div className="bg-white p-3.5 rounded-2xl border border-stone-200 bg-stone-50/50 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-stone-600">2. مردود المبيعات (-):</span>
+            <div className="w-7 h-7 rounded-lg bg-stone-200 text-stone-800 flex items-center justify-center">
+              <RotateCcw className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="text-xl sm:text-2xl font-mono font-black text-rose-700">
+              -{salesReturnsTotal.toLocaleString()}{' '}
+              <span className="text-xs font-sans font-normal text-stone-600">
+                {storeSettings.currency}
+              </span>
+            </div>
+            <div className="text-[10px] text-stone-500 mt-0.5">
+              من {returnsCount} سند مردود مبيعات
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Total Collected Deposits */}
         <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50/30 to-white shadow-xs hover:border-emerald-400 transition-all flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-800">2. مقبوضات العربون:</span>
+            <span className="text-xs font-bold text-emerald-800">3. مقبوضات العربون:</span>
             <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
-              <span className="text-xs font-bold">💵</span>
+              <ArrowDownLeft className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2">
@@ -112,17 +141,17 @@ export function TreasuryModule() {
               </span>
             </div>
             <div className="text-[10px] text-emerald-700 mt-0.5">
-              مفصلة من حجوزات وعرابين الكيك
+              مفصلة من عربون وحجوزات الكيك
             </div>
           </div>
         </div>
 
-        {/* 3. Total Daily Expenses */}
+        {/* 4. Total Daily Expenses */}
         <div className="bg-white p-3.5 rounded-2xl border border-rose-200 bg-gradient-to-b from-rose-50/30 to-white shadow-xs hover:border-rose-400 transition-all flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-800">3. صرفيات اليومية:</span>
+            <span className="text-xs font-bold text-rose-800">4. صرفيات اليومية:</span>
             <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-800 flex items-center justify-center">
-              <ArrowDownLeft className="w-4 h-4" />
+              <Receipt className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2">
@@ -133,15 +162,15 @@ export function TreasuryModule() {
               </span>
             </div>
             <div className="text-[10px] text-rose-700 mt-0.5">
-              من {expensesCount} سند صرف مسجل اليوم
+              من {expensesCount} سند صرف مسجل
             </div>
           </div>
         </div>
 
-        {/* 4. Net Cash in Drawer = (Direct Sales + Deposits) - Daily Expenses */}
+        {/* 5. Net Cash in Drawer */}
         <div className="bg-brand-900 text-white p-3.5 rounded-2xl shadow-md border-2 border-gold-500/50 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gold-300">4. صافي النقد في الصندوق:</span>
+            <span className="text-xs font-bold text-gold-300">5. صافي النقد بالصندوق:</span>
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           </div>
           <div className="mt-2">
@@ -152,7 +181,7 @@ export function TreasuryModule() {
               </span>
             </div>
             <div className="text-[10px] text-warm-200 mt-0.5 font-mono">
-              = (المبيعات + العربون) - الصرفيات
+              = (المبيعات - المردود + العربون) - الصرفيات
             </div>
           </div>
         </div>
@@ -161,10 +190,11 @@ export function TreasuryModule() {
       {/* Internal Navigation Subtabs */}
       <div className="px-3 sm:px-4 bg-white border-b border-warm-200/80 flex items-center gap-2 overflow-x-auto">
         {[
-          { id: 'summary', label: 'معادلة الميزانية والخلاصة 🧮' },
-          { id: 'today_sales', label: `فواتير مبيعات اليومية (${salesCount}) 🧾` },
-          { id: 'today_expenses', label: `سندات صرف اليومية (${expensesCount}) 💸` },
-          { id: 'past_zreports', label: `أرشيف إغلاقات Z السابقة (${zReportsHistory.length}) 🗄️` },
+          { id: 'summary', label: 'معادلة الميزانية والخلاصة' },
+          { id: 'today_sales', label: `فواتير المبيعات (${salesCount})` },
+          { id: 'today_returns', label: `مردودات المبيعات (${returnsCount})` },
+          { id: 'today_expenses', label: `سندات الصرف (${expensesCount})` },
+          { id: 'past_zreports', label: `أرشيف إغلاقات Z (${zReportsHistory.length})` },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -199,6 +229,15 @@ export function TreasuryModule() {
                   </div>
                 </div>
 
+                <div className="text-lg font-black text-stone-400">-</div>
+
+                <div className="bg-stone-100 border border-stone-300 p-3 rounded-xl flex-1 w-full text-stone-900">
+                  <div className="text-[11px] text-stone-600">مردود المبيعات</div>
+                  <div className="text-base font-mono font-black mt-0.5 text-rose-700">
+                    {salesReturnsTotal.toLocaleString()} {storeSettings.currency}
+                  </div>
+                </div>
+
                 <div className="text-lg font-black text-stone-400">+</div>
 
                 <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex-1 w-full text-emerald-950">
@@ -228,7 +267,7 @@ export function TreasuryModule() {
               </div>
 
               <div className="p-3 bg-warm-100 rounded-xl text-xs text-stone-700 leading-relaxed text-right">
-                📌 <strong>ملاحظة هامة:</strong> زر "إغلاق اليومية وتصفير الصندوق" يقوم تلقائياً بإنشاء تقرير Z شامل، وإرساله للطباعة الحرارية 72.1mm، ثم يعيد تعيين عداد المبيعات والصرفيات للصفر لبداية وردية جديدة، مع حفظ كل المبيعات في سجل تاريخي آمن.
+                <strong>حماية أمنية:</strong> تصفير الصندوق وإغلاق اليومية محمي برمز تأكيد المدير (الافتراضي 1234). عند التصفير، يُطبع تقرير Z اليومي وتُعاد العدادات النشطة للصفر دون حذف أي فواتير تاريخية.
               </div>
             </div>
           </div>
@@ -295,7 +334,64 @@ export function TreasuryModule() {
           </div>
         )}
 
-        {/* TAB 3: Today's Expenses */}
+        {/* TAB 3: Today's Returns */}
+        {activeTab === 'today_returns' && (
+          <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-xs">
+            <table className="w-full text-right text-xs">
+              <thead className="bg-warm-100 font-bold text-stone-700 border-b border-warm-200">
+                <tr>
+                  <th className="py-2.5 px-3">رقم سند المردود</th>
+                  <th className="py-2.5 px-3">الوقت</th>
+                  <th className="py-2.5 px-3">المبلغ المسترجع</th>
+                  <th className="py-2.5 px-3">الزبون</th>
+                  <th className="py-2.5 px-3">السبب</th>
+                  <th className="py-2.5 px-3 text-center">طباعة الوصل</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-warm-100">
+                {sessionReturns.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="py-8 text-center text-stone-400 font-bold">
+                      لا توجد مردودات مبيعات مسجلة في الوردية الحالية
+                    </td>
+                  </tr>
+                ) : (
+                  sessionReturns.map((ret) => (
+                    <tr key={ret.id} className="hover:bg-warm-50/60">
+                      <td className="py-2.5 px-3 font-mono font-bold text-rose-800">
+                        {ret.returnNo}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-stone-500">
+                        {new Date(ret.date).toLocaleTimeString('ar-IQ', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono font-black text-rose-700 text-sm">
+                        -{Number(ret.amount).toLocaleString()} {storeSettings.currency}
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-stone-800">
+                        {ret.customerName}
+                      </td>
+                      <td className="py-2.5 px-3 text-stone-600">{ret.reason}</td>
+                      <td className="py-2.5 px-3 text-center">
+                        <button
+                          onClick={() => triggerPrint('sales_return', ret)}
+                          title="طباعة وصل المردود"
+                          className="p-1.5 hover:bg-brand-50 text-stone-600 hover:text-brand-800 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* TAB 4: Today's Expenses */}
         {activeTab === 'today_expenses' && (
           <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-xs">
             <table className="w-full text-right text-xs">
@@ -352,7 +448,7 @@ export function TreasuryModule() {
           </div>
         )}
 
-        {/* TAB 4: Past Z-Reports History */}
+        {/* TAB 5: Past Z-Reports History */}
         {activeTab === 'past_zreports' && (
           <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-xs">
             <table className="w-full text-right text-xs">
@@ -361,6 +457,7 @@ export function TreasuryModule() {
                   <th className="py-2.5 px-3">رقم تقرير Z</th>
                   <th className="py-2.5 px-3">وقت الإغلاق</th>
                   <th className="py-2.5 px-3">المبيعات</th>
+                  <th className="py-2.5 px-3">المردود</th>
                   <th className="py-2.5 px-3">العربون</th>
                   <th className="py-2.5 px-3">الصرفيات</th>
                   <th className="py-2.5 px-3">صافي الصندوق</th>
@@ -371,7 +468,7 @@ export function TreasuryModule() {
               <tbody className="divide-y divide-warm-100">
                 {zReportsHistory.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="py-8 text-center text-stone-400 font-bold">
+                    <td colSpan="9" className="py-8 text-center text-stone-400 font-bold">
                       لا توجد إغلاقات Z مؤرشفة بعد. سيتم أرشفة أول تقرير عند تصفير الصندوق.
                     </td>
                   </tr>
@@ -390,6 +487,9 @@ export function TreasuryModule() {
                       </td>
                       <td className="py-2.5 px-3 font-mono font-bold">
                         {(rep.directSales || 0).toLocaleString()} {storeSettings.currency}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-rose-700 font-bold">
+                        {(rep.salesReturns || 0) > 0 ? `-${(rep.salesReturns || 0).toLocaleString()} ${storeSettings.currency}` : '-'}
                       </td>
                       <td className="py-2.5 px-3 font-mono text-emerald-700 font-bold">
                         +{(rep.collectedDeposits || 0).toLocaleString()} {storeSettings.currency}
@@ -419,7 +519,14 @@ export function TreasuryModule() {
         )}
       </div>
 
-      {/* Confirmation Dialog */}
+      {/* 1. Manager PIN Authentication Modal */}
+      <ManagerPinModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        onSuccess={handlePinSuccess}
+      />
+
+      {/* 2. Z-Report Execution & Confirmation Dialog */}
       <ZReportConfirmationModal
         isOpen={isZModalOpen}
         onClose={() => setIsZModalOpen(false)}

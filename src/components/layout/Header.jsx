@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Sparkles,
   ShoppingBag,
   CalendarDays,
   Receipt,
@@ -11,7 +10,7 @@ import {
   Maximize,
   Minimize,
   Clock,
-  CircleDot,
+  Sparkles,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 
@@ -70,7 +69,7 @@ export function Header({ activeTab, setActiveTab, onOpenSettings }) {
       shortLabel: 'الحجوزات',
       icon: CalendarDays,
       badge: pendingReservationsCount > 0 ? pendingReservationsCount : null,
-      badgeColor: 'bg-rose-500 text-white',
+      badgeColor: 'bg-rose-600 text-white',
     },
     {
       id: 'expenses',
@@ -94,7 +93,7 @@ export function Header({ activeTab, setActiveTab, onOpenSettings }) {
         {/* Brand & Boutique Identity */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-700 to-brand-950 border border-gold-500/50 flex items-center justify-center shadow-inner flex-shrink-0">
-            <span className="text-xl">🍰</span>
+            <span className="font-serif font-black text-lg text-gold-400">MZ</span>
           </div>
           <div>
             <div className="flex items-center gap-1.5">
@@ -120,7 +119,7 @@ export function Header({ activeTab, setActiveTab, onOpenSettings }) {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`relative px-2.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all ${
+                className={`relative px-2.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
                   isActive
                     ? 'bg-warm-50 text-brand-900 shadow-md font-extrabold translate-y-[-1px]'
                     : 'text-warm-100 hover:bg-brand-700/70 hover:text-white'
@@ -184,7 +183,7 @@ export function Header({ activeTab, setActiveTab, onOpenSettings }) {
           <button
             onClick={toggleSound}
             title={storeSettings.allowSound ? 'كتم التنبيهات الصوتية' : 'تفعيل التنبيهات الصوتية'}
-            className="w-8 h-8 rounded-lg bg-brand-700/60 hover:bg-brand-700 flex items-center justify-center text-warm-200 hover:text-white transition-colors"
+            className="w-8 h-8 rounded-lg bg-brand-700/60 hover:bg-brand-700 flex items-center justify-center text-warm-200 hover:text-white transition-colors cursor-pointer"
           >
             {storeSettings.allowSound ? (
               <Volume2 className="w-4 h-4 text-gold-400" />
@@ -197,7 +196,7 @@ export function Header({ activeTab, setActiveTab, onOpenSettings }) {
           <button
             onClick={toggleFullscreen}
             title="ملء الشاشة"
-            className="w-8 h-8 rounded-lg bg-brand-700/60 hover:bg-brand-700 hidden sm:flex items-center justify-center text-warm-200 hover:text-white transition-colors"
+            className="w-8 h-8 rounded-lg bg-brand-700/60 hover:bg-brand-700 hidden sm:flex items-center justify-center text-warm-200 hover:text-white transition-colors cursor-pointer"
           >
             {isFullscreen ? (
               <Minimize className="w-4 h-4" />
@@ -210,7 +209,7 @@ export function Header({ activeTab, setActiveTab, onOpenSettings }) {
           <button
             onClick={onOpenSettings}
             title="إعدادات النظام والنسخ الاحتياطي"
-            className="w-8 h-8 rounded-lg bg-brand-700/60 hover:bg-brand-700 flex items-center justify-center text-warm-200 hover:text-white transition-colors"
+            className="w-8 h-8 rounded-lg bg-brand-700/60 hover:bg-brand-700 flex items-center justify-center text-warm-200 hover:text-white transition-colors cursor-pointer"
           >
             <Settings className="w-4 h-4" />
           </button>

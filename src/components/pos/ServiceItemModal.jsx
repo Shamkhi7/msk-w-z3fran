@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, DollarSign, Wallet } from 'lucide-react';
+import { X, Check, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 
 export function ServiceItemModal({ serviceType, isOpen, onClose }) {
@@ -11,7 +11,6 @@ export function ServiceItemModal({ serviceType, isOpen, onClose }) {
 
   const isDeposit = serviceType === 'deposit';
   const title = isDeposit ? 'تسجيل عربون حجز (Advance Deposit)' : 'تسجيل متبقي حجز (Remaining Balance)';
-  const emoji = isDeposit ? '💵' : '💰';
   const defaultBaseAmount = isDeposit ? 10000 : 15000;
 
   const quickAmounts = [5000, 10000, 15000, 20000, 25000, 50000];
@@ -29,7 +28,6 @@ export function ServiceItemModal({ serviceType, isOpen, onClose }) {
       isService: true,
       isDeposit,
       price: finalAmount,
-      emoji,
     };
 
     const customizedProduct = {
@@ -53,12 +51,12 @@ export function ServiceItemModal({ serviceType, isOpen, onClose }) {
           isDeposit ? 'bg-emerald-800' : 'bg-brand-800'
         }`}>
           <div className="flex items-center gap-2">
-            <span className="text-xl">{emoji}</span>
+            {isDeposit ? <ArrowDownLeft className="w-5 h-5 text-gold-400" /> : <ArrowUpRight className="w-5 h-5 text-gold-400" />}
             <h3 className="font-bold text-sm">{title}</h3>
           </div>
           <button
             onClick={onClose}
-            className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-black/20 transition-colors"
+            className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-black/20 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>

@@ -58,12 +58,9 @@ export function ProductEditModal({ product, isOpen, onClose }) {
 
         {/* Content */}
         <form onSubmit={handleSave} className="p-4 space-y-4">
-          <div className="flex items-center gap-3 p-2 bg-white rounded-xl border border-warm-200">
-            <span className="text-3xl">{product.emoji || '🍰'}</span>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs text-stone-500 font-mono">{product.barcode}</div>
-              <div className="font-bold text-stone-800 text-sm truncate">{product.name}</div>
-            </div>
+          <div className="p-2.5 bg-white rounded-xl border border-warm-200">
+            <div className="text-xs text-stone-500 font-mono">{product.barcode}</div>
+            <div className="font-bold text-stone-800 text-sm truncate mt-0.5">{product.name}</div>
           </div>
 
           <div>

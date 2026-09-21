@@ -10,15 +10,14 @@ export function AddCategoryModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const iconOptions = [
-    { id: 'Cake', label: 'كيك 🍰' },
-    { id: 'Layers', label: 'قوالب 🎂' },
-    { id: 'Coffee', label: 'موس/أقداح 🍮' },
-    { id: 'Candy', label: 'حلويات 🍬' },
-    { id: 'Croissant', label: 'معجنات 🥐' },
-    { id: 'CupSoda', label: 'مشروبات 🥤' },
-    { id: 'PartyPopper', label: 'حفلات 🎉' },
-    { id: 'Sparkles', label: 'مميز ✨' },
-    { id: 'Tag', label: 'عام 🏷️' },
+    { id: 'Cake', label: 'كيك' },
+    { id: 'Layers', label: 'قوالب' },
+    { id: 'Coffee', label: 'موس وأقداح' },
+    { id: 'Candy', label: 'حلويات' },
+    { id: 'Croissant', label: 'معجنات' },
+    { id: 'CupSoda', label: 'مشروبات' },
+    { id: 'PartyPopper', label: 'مستلزمات' },
+    { id: 'Tag', label: 'عام' },
   ];
 
   const handleSubmit = (e) => {
@@ -65,7 +64,7 @@ export function AddCategoryModal({ isOpen, onClose }) {
             <label className="block text-xs font-bold text-stone-700 mb-1">
               أيقونة القسم:
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {iconOptions.map((opt) => (
                 <button
                   key={opt.id}

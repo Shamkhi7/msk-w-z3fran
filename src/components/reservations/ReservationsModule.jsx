@@ -8,8 +8,6 @@ import {
   Printer,
   Phone,
   Cake,
-  Filter,
-  ArrowRight,
   PackageCheck,
   AlertCircle,
 } from 'lucide-react';
@@ -32,7 +30,6 @@ export function ReservationsModule() {
   const todayStr = new Date().toISOString().split('T')[0];
 
   const filteredReservations = reservations.filter((r) => {
-    // Search match
     const matchesSearch =
       !searchQuery.trim() ||
       r.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -40,7 +37,6 @@ export function ReservationsModule() {
       r.receiptNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (r.writtenText && r.writtenText.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    // Filter tab
     if (!matchesSearch) return false;
     if (activeFilter === 'all') return true;
     if (activeFilter === 'today') return r.pickupDate === todayStr;
@@ -112,10 +108,10 @@ export function ReservationsModule() {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           {[
             { id: 'all', label: 'كافة الحجوزات' },
-            { id: 'today', label: 'استلام اليوم 🎯' },
-            { id: 'preparing', label: 'قيد التحضير ⏳' },
-            { id: 'ready', label: 'جاهز للتسليم 📦' },
-            { id: 'delivered', label: 'تم التسليم ✅' },
+            { id: 'today', label: 'استلام اليوم' },
+            { id: 'preparing', label: 'قيد التحضير' },
+            { id: 'ready', label: 'جاهز للتسليم' },
+            { id: 'delivered', label: 'تم التسليم' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -175,7 +171,7 @@ export function ReservationsModule() {
                         </span>
                         {isToday && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white animate-pulse">
-                            استلام اليوم!
+                            استلام اليوم
                           </span>
                         )}
                       </div>
@@ -197,7 +193,7 @@ export function ReservationsModule() {
                   </div>
 
                   {/* Pickup Time & Date */}
-                  <div className="bg-amber-50/70 p-2.5 rounded-xl border border-amber-200/70 text-xs text-amber-950 flex justify-between items-center">
+                  <div className="bg-warm-100/70 p-2.5 rounded-xl border border-warm-200 text-xs text-stone-800 flex justify-between items-center">
                     <span className="font-semibold">موعد الاستلام:</span>
                     <span className="font-bold">
                       {res.pickupDate} ({res.pickupTime})
@@ -256,7 +252,6 @@ export function ReservationsModule() {
 
                   {/* Action Buttons */}
                   <div className="pt-2 border-t border-stone-200 flex items-center gap-1.5 flex-wrap">
-                    {/* Status Changer Dropdown */}
                     <select
                       value={res.status}
                       onChange={(e) => updateReservationStatus(res.id, e.target.value)}
@@ -268,7 +263,6 @@ export function ReservationsModule() {
                       <option value="ملغي">ملغي</option>
                     </select>
 
-                    {/* Deliver & Collect Balance Action */}
                     {res.status !== 'تم التسليم' && res.remainingBalance > 0 && (
                       <button
                         onClick={() => deliverReservationAndCollectBalance(res)}
@@ -280,7 +274,6 @@ export function ReservationsModule() {
                       </button>
                     )}
 
-                    {/* Re-print Receipt Button */}
                     <button
                       onClick={() => triggerPrint('reservation', res)}
                       title="إعادة طباعة وصل الحجز الحراري"
@@ -296,7 +289,6 @@ export function ReservationsModule() {
         )}
       </div>
 
-      {/* Reservation Form Modal */}
       <ReservationFormModal
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}

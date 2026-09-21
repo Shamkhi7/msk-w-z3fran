@@ -14,20 +14,25 @@ const POSContext = createContext(null);
 export function POSProvider({ children }) {
   const audio = useAudioBeep();
 
-  // 1. Core Settings & Store Info
+  // 1. Core Settings & Store Info (with default managerPin: '1234')
   const [storeSettings, setStoreSettings] = useLocalStorage('mz_settings', DEFAULT_STORE_SETTINGS);
 
   // 2. Catalog (Categories & Products)
+  // Ensure 'cat-all' is removed even if previously cached in localStorage
   const [categories, setCategories] = useLocalStorage('mz_categories', DEFAULT_CATEGORIES);
+  const cleanCategories = useMemo(() => {
+    return categories.filter((c) => c.id !== 'cat-all');
+  }, [categories]);
+
   const [products, setProducts] = useLocalStorage('mz_products', DEFAULT_PRODUCTS);
-  const [activeCategory, setActiveCategory] = useState('cat-all');
+  // Default to first valid category ('cat-cakes')
+  const [activeCategory, setActiveCategory] = useState('cat-cakes');
   const [searchQuery, setSearchQuery] = useState('');
 
   // 3. Active Cart State
   const [cart, setCart] = useLocalStorage('mz_active_cart', []);
 
   // 4. Drawer Sessions & Treasury
-  // Current active session ID
   const [currentSession, setCurrentSession] = useLocalStorage('mz_current_session', {
     sessionId: 'SESSION-' + new Date().toISOString().split('T')[0],
     openedAt: new Date().toISOString(),
@@ -36,6 +41,9 @@ export function POSProvider({ children }) {
 
   // Permanent Sales History
   const [salesHistory, setSalesHistory] = useLocalStorage('mz_sales_history', []);
+
+  // Sales Returns / Refunds History
+  const [salesReturns, setSalesReturns] = useLocalStorage('mz_sales_returns', []);
 
   // Permanent Reservations Record
   const [reservations, setReservations] = useLocalStorage('mz_reservations', INITIAL_RESERVATIONS);
@@ -49,11 +57,11 @@ export function POSProvider({ children }) {
   // 5. Thermal Printing State
   const [printJob, setPrintJob] = useState({
     isOpen: false,
-    type: null, // 'sale' | 'reservation' | 'expense' | 'zreport'
+    type: null, // 'sale' | 'reservation' | 'expense' | 'combined_expenses' | 'sales_return' | 'zreport'
     data: null,
   });
 
-  // Sound helper wrapper checking store settings
+  // Sound helper
   const playSound = (type) => {
     if (!storeSettings.allowSound) return;
     if (type === 'add') audio.playAddToCart();
@@ -72,7 +80,7 @@ export function POSProvider({ children }) {
       icon,
       color,
     };
-    setCategories((prev) => [...prev, newCat]);
+    setCategories((prev) => [...prev.filter((c) => c.id !== 'cat-all'), newCat]);
     return newCat;
   };
 
@@ -83,8 +91,6 @@ export function POSProvider({ children }) {
       categoryId: productData.categoryId || 'cat-cakes',
       price: Number(productData.price) || 0,
       cost: Number(productData.cost) || 0,
-      emoji: productData.emoji || '🍰',
-      image: productData.image || '',
       barcode: productData.barcode || 'MZ-' + Math.floor(1000 + Math.random() * 9000),
       isAvailable: productData.isAvailable !== false,
       isService: productData.isService || false,
@@ -103,7 +109,6 @@ export function POSProvider({ children }) {
 
   const deleteProduct = (id) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
-    // Also remove from cart if present
     setCart((prev) => prev.filter((item) => item.product.id !== id));
   };
 
@@ -127,7 +132,6 @@ export function POSProvider({ children }) {
         customPrice !== null ? Number(customPrice) : Number(product.price);
 
       if (existingIndex > -1 && customPrice === null) {
-        // Increment quantity if standard catalog price
         return prevCart.map((item, idx) =>
           idx === existingIndex
             ? { ...item, quantity: item.quantity + 1 }
@@ -135,7 +139,6 @@ export function POSProvider({ children }) {
         );
       }
 
-      // If new item or custom priced service item
       return [
         ...prevCart,
         {
@@ -143,8 +146,8 @@ export function POSProvider({ children }) {
           product,
           quantity: 1,
           originalPrice: Number(product.price),
-          unitPrice: resolvedPrice, // Can be overridden for this order only
-          discount: 0, // Deduction discount in currency amount for this item
+          unitPrice: resolvedPrice,
+          discount: 0,
           isOverridden: customPrice !== null && customPrice !== product.price,
           note: '',
         },
@@ -174,7 +177,6 @@ export function POSProvider({ children }) {
     setCart([]);
   };
 
-  // SINGLE-ORDER OVERRIDE: Modify unit price strictly for this cart order
   const overrideCartItemPrice = (cartItemId, newPrice) => {
     const price = Number(newPrice);
     if (isNaN(price) || price < 0) return;
@@ -192,7 +194,6 @@ export function POSProvider({ children }) {
     );
   };
 
-  // SINGLE-ORDER DISCOUNT: Deduct fixed amount from the item
   const applyCartItemDiscount = (cartItemId, discountAmount) => {
     const disc = Number(discountAmount);
     setCart((prev) =>
@@ -209,7 +210,7 @@ export function POSProvider({ children }) {
   };
 
   // ==========================================
-  // CART FINANCIAL TOTALS CALCULATION
+  // CART FINANCIAL TOTALS
   // ==========================================
   const cartSummary = useMemo(() => {
     let subtotal = 0;
@@ -248,7 +249,6 @@ export function POSProvider({ children }) {
 
     const receiptNo = 'INV-' + new Date().getFullYear() + '-' + (salesHistory.length + 1001);
     
-    // Check if cart contains any advance deposits
     const depositAmountInCart = cart
       .filter((item) => item.product.isDeposit || item.product.id === 'service-deposit')
       .reduce((sum, item) => sum + Math.max(0, item.unitPrice * item.quantity - item.discount), 0);
@@ -267,7 +267,7 @@ export function POSProvider({ children }) {
       directSalesAmount: directSalesAmount,
       amountReceived: Number(paymentData.amountReceived) || cartSummary.netTotal,
       changeDue: Number(paymentData.changeDue) || 0,
-      paymentMethod: paymentData.paymentMethod || 'نقداً', // نقداً, بطاقة, آجل
+      paymentMethod: paymentData.paymentMethod || 'نقداً',
       customerName: paymentData.customerName || 'زبون عام',
       cashierName: storeSettings.cashierName,
       date: new Date().toISOString(),
@@ -278,10 +278,36 @@ export function POSProvider({ children }) {
     clearCart();
     playSound('success');
 
-    // Trigger Print Receipt
     triggerPrint('sale', newSale);
-
     return newSale;
+  };
+
+  // ==========================================
+  // SALES RETURN / REFUND MODULE
+  // ==========================================
+  const addSalesReturn = (returnData) => {
+    const returnNo = 'RET-' + new Date().getFullYear() + '-' + (salesReturns.length + 1001);
+    const amount = Number(returnData.amount) || 0;
+
+    const newReturn = {
+      id: 'RET-' + Date.now(),
+      returnNo,
+      sessionId: currentSession.sessionId,
+      amount: amount,
+      customerName: returnData.customerName || 'زبون عام',
+      originalReceiptNo: returnData.originalReceiptNo || '',
+      reason: returnData.reason || 'إرجاع صنف ومسترجع نقدي',
+      items: returnData.items || [],
+      cashierName: storeSettings.cashierName,
+      date: new Date().toISOString(),
+    };
+
+    setSalesReturns((prev) => [newReturn, ...prev]);
+    playSound('remove');
+
+    // Trigger Print Return Receipt
+    triggerPrint('sales_return', newReturn);
+    return newReturn;
   };
 
   // ==========================================
@@ -307,7 +333,7 @@ export function POSProvider({ children }) {
       totalCost: total,
       depositPaid: deposit,
       remainingBalance: remaining,
-      status: 'قيد التحضير', // قيد التحضير, جاهز, تم التسليم, ملغي
+      status: 'قيد التحضير',
       notes: reservationData.notes || '',
       createdAt: new Date().toISOString(),
       depositSessionId: currentSession.sessionId,
@@ -315,7 +341,6 @@ export function POSProvider({ children }) {
 
     setReservations((prev) => [newReservation, ...prev]);
 
-    // If cashier opted to ring up the deposit into today's drawer immediately
     if (ringUpDepositToDrawer && deposit > 0) {
       const depositSale = {
         id: 'SALE-DEP-' + Date.now(),
@@ -328,7 +353,6 @@ export function POSProvider({ children }) {
               id: 'service-deposit',
               name: `عربون حجز كيك (${reservationData.customerName} - قياس ${reservationData.cakeSize})`,
               isDeposit: true,
-              emoji: '💵',
             },
             quantity: 1,
             originalPrice: deposit,
@@ -356,7 +380,6 @@ export function POSProvider({ children }) {
 
     playSound('success');
     triggerPrint('reservation', newReservation);
-
     return newReservation;
   };
 
@@ -367,7 +390,6 @@ export function POSProvider({ children }) {
   };
 
   const deliverReservationAndCollectBalance = (reservation) => {
-    // Ring up the remaining balance into today's sales
     if (reservation.remainingBalance > 0) {
       const remainingSale = {
         id: 'SALE-REM-' + Date.now(),
@@ -380,7 +402,6 @@ export function POSProvider({ children }) {
               id: 'service-remaining',
               name: `متبقي حجز كيك (${reservation.customerName} - ${reservation.receiptNumber})`,
               isDeposit: false,
-              emoji: '💰',
             },
             quantity: 1,
             originalPrice: reservation.remainingBalance,
@@ -407,7 +428,6 @@ export function POSProvider({ children }) {
       triggerPrint('sale', remainingSale);
     }
 
-    // Update reservation status to delivered and remaining to 0
     setReservations((prev) =>
       prev.map((r) =>
         r.id === reservation.id
@@ -438,7 +458,6 @@ export function POSProvider({ children }) {
     setExpenses((prev) => [newExpense, ...prev]);
     playSound('remove');
 
-    // Trigger Print Expense Voucher
     triggerPrint('expense', newExpense);
     return newExpense;
   };
@@ -451,6 +470,18 @@ export function POSProvider({ children }) {
 
   const deleteExpense = (id) => {
     setExpenses((prev) => prev.filter((exp) => exp.id !== id));
+  };
+
+  // Combined expenses thermal printing helper
+  const printCombinedExpenses = () => {
+    const sessionExpenses = expenses.filter(
+      (e) => e.sessionId === currentSession.sessionId
+    );
+    if (sessionExpenses.length === 0) {
+      alert('لا توجد صرفيات مسجلة في الوردية الحالية للطباعة');
+      return;
+    }
+    triggerPrint('combined_expenses', sessionExpenses);
   };
 
   // ==========================================
@@ -470,13 +501,25 @@ export function POSProvider({ children }) {
       0
     );
 
-    // 2. Total Collected Deposits (itemized from "عربون حجز")
+    // 2. Sales Returns / Refunds in this session
+    const sessionReturns = salesReturns.filter(
+      (r) => r.sessionId === activeSessionId
+    );
+    const salesReturnsTotal = sessionReturns.reduce(
+      (sum, r) => sum + Number(r.amount),
+      0
+    );
+
+    // Net Direct Sales after subtracting returns
+    const netDirectSales = Math.max(0, directSales - salesReturnsTotal);
+
+    // 3. Total Collected Deposits
     const collectedDeposits = sessionSales.reduce(
       (sum, s) => sum + (s.depositAmount || 0),
       0
     );
 
-    // 3. Total Daily Expenses in this session
+    // 4. Total Daily Expenses in this session
     const sessionExpenses = expenses.filter(
       (e) => e.sessionId === activeSessionId
     );
@@ -485,20 +528,24 @@ export function POSProvider({ children }) {
       0
     );
 
-    // 4. Net Cash in Drawer = (Direct Sales + Deposits) - Daily Expenses
-    const netCash = (directSales + collectedDeposits) - dailyExpenses;
+    // 5. Net Cash in Drawer = (Direct Sales - Sales Returns + Deposits) - Daily Expenses
+    const netCash = (directSales - salesReturnsTotal + collectedDeposits) - dailyExpenses;
 
     return {
       sessionSales,
       sessionExpenses,
+      sessionReturns,
       directSales,
+      salesReturnsTotal,
+      netDirectSales,
       collectedDeposits,
       dailyExpenses,
       netCash,
       salesCount: sessionSales.length,
       expensesCount: sessionExpenses.length,
+      returnsCount: sessionReturns.length,
     };
-  }, [salesHistory, expenses, currentSession]);
+  }, [salesHistory, salesReturns, expenses, currentSession]);
 
   // ==========================================
   // END-OF-DAY RESET & Z-REPORT
@@ -514,22 +561,22 @@ export function POSProvider({ children }) {
       closedAt: closingTime,
       closedBy: storeSettings.cashierName,
       directSales: dailyTreasury.directSales,
+      salesReturns: dailyTreasury.salesReturnsTotal,
       collectedDeposits: dailyTreasury.collectedDeposits,
       dailyExpenses: dailyTreasury.dailyExpenses,
       netCash: dailyTreasury.netCash,
       salesCount: dailyTreasury.salesCount,
       expensesCount: dailyTreasury.expensesCount,
+      returnsCount: dailyTreasury.returnsCount,
       notes: closingNotes,
     };
 
-    // 1. Save Z-Report to historical archive
     setZReportsHistory((prev) => [zReport, ...prev]);
 
-    // 2. Automatically print the Daily Z-Report
+    // Automatically trigger printing of the Daily Z-Report
     triggerPrint('zreport', zReport);
 
-    // 3. Reset today's active sales, deposits, and daily expenses counters to 0 for the new day
-    // by starting a fresh active session
+    // Reset today's active session
     const newSessionId = 'SESSION-' + Date.now();
     setCurrentSession({
       sessionId: newSessionId,
@@ -539,6 +586,24 @@ export function POSProvider({ children }) {
 
     playSound('success');
     return zReport;
+  };
+
+  // ==========================================
+  // MANAGER PIN MANAGEMENT
+  // ==========================================
+  const updateManagerPin = (currentPin, newPin) => {
+    const storedPin = storeSettings.managerPin || '1234';
+    if (currentPin !== storedPin) {
+      return { success: false, message: 'رمز المدير الحالي غير صحيح' };
+    }
+    if (!newPin || newPin.length < 4) {
+      return { success: false, message: 'يجب أن يتكون الرمز الجديد من 4 أرقام على الأقل' };
+    }
+    setStoreSettings((prev) => ({
+      ...prev,
+      managerPin: String(newPin),
+    }));
+    return { success: true, message: 'تم تحديث رمز تأكيد المدير بنجاح' };
   };
 
   // ==========================================
@@ -565,12 +630,13 @@ export function POSProvider({ children }) {
   // ==========================================
   const exportSystemData = () => {
     const backup = {
-      version: '1.0',
+      version: '1.1',
       exportedAt: new Date().toISOString(),
       storeSettings,
-      categories,
+      categories: cleanCategories,
       products,
       salesHistory,
+      salesReturns,
       reservations,
       expenses,
       zReportsHistory,
@@ -590,9 +656,10 @@ export function POSProvider({ children }) {
   const importSystemData = (jsonData) => {
     try {
       if (jsonData.storeSettings) setStoreSettings(jsonData.storeSettings);
-      if (jsonData.categories) setCategories(jsonData.categories);
+      if (jsonData.categories) setCategories(jsonData.categories.filter((c) => c.id !== 'cat-all'));
       if (jsonData.products) setProducts(jsonData.products);
       if (jsonData.salesHistory) setSalesHistory(jsonData.salesHistory);
+      if (jsonData.salesReturns) setSalesReturns(jsonData.salesReturns);
       if (jsonData.reservations) setReservations(jsonData.reservations);
       if (jsonData.expenses) setExpenses(jsonData.expenses);
       if (jsonData.zReportsHistory) setZReportsHistory(jsonData.zReportsHistory);
@@ -612,6 +679,7 @@ export function POSProvider({ children }) {
     setReservations(INITIAL_RESERVATIONS);
     setExpenses(INITIAL_EXPENSES);
     setSalesHistory([]);
+    setSalesReturns([]);
     setCart([]);
     setCurrentSession({
       sessionId: 'SESSION-' + Date.now(),
@@ -625,9 +693,10 @@ export function POSProvider({ children }) {
     // Settings & Branding
     storeSettings,
     setStoreSettings,
+    updateManagerPin,
 
     // Catalog
-    categories,
+    categories: cleanCategories,
     products,
     activeCategory,
     setActiveCategory,
@@ -653,6 +722,10 @@ export function POSProvider({ children }) {
     completeSale,
     salesHistory,
 
+    // Sales Returns
+    salesReturns,
+    addSalesReturn,
+
     // Reservations
     reservations,
     addReservation,
@@ -664,6 +737,7 @@ export function POSProvider({ children }) {
     addExpense,
     updateExpense,
     deleteExpense,
+    printCombinedExpenses,
 
     // Treasury & Z-Report
     currentSession,

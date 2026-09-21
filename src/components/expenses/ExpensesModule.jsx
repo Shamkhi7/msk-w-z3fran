@@ -8,15 +8,20 @@ import {
   Printer,
   Edit,
   Trash2,
-  User,
-  ArrowUpDown,
-  Download,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { ExpenseFormModal } from './ExpenseFormModal';
 
 export function ExpensesModule() {
-  const { expenses, deleteExpense, triggerPrint, storeSettings } = usePOS();
+  const {
+    expenses,
+    deleteExpense,
+    triggerPrint,
+    printCombinedExpenses,
+    storeSettings,
+    currentSession,
+  } = usePOS();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -38,7 +43,6 @@ export function ExpensesModule() {
 
   // Filtering Logic
   const filteredExpenses = expenses.filter((item) => {
-    // Keyword match
     const query = searchQuery.trim().toLowerCase();
     const matchesQuery =
       !query ||
@@ -46,11 +50,9 @@ export function ExpensesModule() {
       (item.description && item.description.toLowerCase().includes(query)) ||
       (item.voucherNo && item.voucherNo.toLowerCase().includes(query));
 
-    // Category match
     const matchesCategory =
       selectedCategory === 'ALL' || item.category === selectedCategory;
 
-    // Date range match
     const itemDate = new Date(item.date).toISOString().split('T')[0];
     const matchesStart = !startDate || itemDate >= startDate;
     const matchesEnd = !endDate || itemDate <= endDate;
@@ -62,6 +64,11 @@ export function ExpensesModule() {
     (sum, e) => sum + Number(e.amount),
     0
   );
+
+  // Session expenses count
+  const todaySessionExpensesCount = expenses.filter(
+    (e) => e.sessionId === currentSession.sessionId
+  ).length;
 
   const handleEdit = (exp) => {
     setEditingExpense(exp);
@@ -84,7 +91,7 @@ export function ExpensesModule() {
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-black text-brand-900 leading-tight">
-              أرشيف وسجل الصرفيات العام
+              أرشيف ومسجل الصرفيات العام
             </h2>
             <p className="text-[11px] text-stone-500">
               سجل دائم لا يحذف عند تصفير الصندوق اليومي • إجمالي السندات: {expenses.length}
@@ -92,61 +99,72 @@ export function ExpensesModule() {
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            setEditingExpense(null);
-            setIsFormOpen(true);
-          }}
-          className="bg-brand-800 hover:bg-brand-900 text-white font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer active:scale-98"
-        >
-          <Plus className="w-4 h-4 text-gold-400" />
-          <span>+ تسجيل سند صرف جديد</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Combined Expenses Print Button */}
+          <button
+            onClick={printCombinedExpenses}
+            title="طباعة جميع صرفيات اليوم في وصل حراري واحد مجمع"
+            className="bg-stone-800 hover:bg-stone-900 text-white font-bold px-3.5 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-xs hover:shadow-md transition-all cursor-pointer active:scale-98"
+          >
+            <Printer className="w-4 h-4 text-gold-400" />
+            <span>طباعة جميع صرفيات اليوم في وصل واحد ({todaySessionExpensesCount})</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setEditingExpense(null);
+              setIsFormOpen(true);
+            }}
+            className="bg-brand-800 hover:bg-brand-900 text-white font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer active:scale-98"
+          >
+            <Plus className="w-4 h-4 text-gold-400" />
+            <span>+ تسجيل سند صرف جديد</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary KPI Cards */}
       <div className="p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white p-3 rounded-xl border border-warm-200 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-3.5 rounded-xl border border-warm-200 shadow-xs flex items-center justify-between">
           <div>
             <div className="text-xs text-stone-500 font-semibold">إجمالي الصرفيات المعروضة:</div>
             <div className="text-xl font-mono font-black text-rose-700 mt-0.5">
               {totalFilteredAmount.toLocaleString()} {storeSettings.currency}
             </div>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center font-bold">
+          <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center font-bold text-xs">
             {filteredExpenses.length}
           </div>
         </div>
 
-        <div className="bg-white p-3 rounded-xl border border-warm-200 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-3.5 rounded-xl border border-warm-200 shadow-xs flex items-center justify-between">
           <div>
-            <div className="text-xs text-stone-500 font-semibold">عدد السندات المطابقة:</div>
+            <div className="text-xs text-stone-500 font-semibold">صرفيات الوردية النشطة:</div>
             <div className="text-xl font-mono font-black text-stone-800 mt-0.5">
-              {filteredExpenses.length} سند صرف
+              {todaySessionExpensesCount} سند صرف
             </div>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-stone-100 text-stone-600 flex items-center justify-center font-bold">
-            📋
+          <div className="w-9 h-9 rounded-xl bg-stone-100 text-stone-700 flex items-center justify-center font-bold">
+            <Receipt className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="bg-white p-3 rounded-xl border border-warm-200 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-3.5 rounded-xl border border-warm-200 shadow-xs flex items-center justify-between">
           <div>
             <div className="text-xs text-stone-500 font-semibold">حالة الأرشيف:</div>
-            <div className="text-xs font-bold text-emerald-700 mt-1 flex items-center gap-1">
+            <div className="text-xs font-bold text-emerald-700 mt-1 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              محفوظ دائمًا عبر التخزين المحلي
+              محفوظ دائمًا دون تأثر بتصفير اليومية
             </div>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-            🛡️
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs">
+            دائم
           </div>
         </div>
       </div>
 
       {/* Filters Bar */}
       <div className="px-3 sm:px-4 pb-3 flex flex-wrap items-center gap-2">
-        {/* Search by recipient or description */}
         <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
           <input
@@ -158,7 +176,6 @@ export function ExpensesModule() {
           />
         </div>
 
-        {/* Category Filter */}
         <select
           value={selectedCategory}
           onChange={(e) => setSelectedCategory(e.target.value)}
@@ -172,7 +189,6 @@ export function ExpensesModule() {
           ))}
         </select>
 
-        {/* Date Range */}
         <div className="flex items-center gap-1.5 bg-white border border-warm-200 rounded-xl px-2 py-1">
           <span className="text-[10px] font-bold text-stone-500">من:</span>
           <input
@@ -257,7 +273,6 @@ export function ExpensesModule() {
                       </td>
                       <td className="py-3 px-3 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5">
-                          {/* Print Thermal Voucher */}
                           <button
                             onClick={() => triggerPrint('expense', exp)}
                             title="طباعة سند صرف حراري (72.1mm)"
@@ -266,7 +281,6 @@ export function ExpensesModule() {
                             <Printer className="w-4 h-4" />
                           </button>
 
-                          {/* Edit */}
                           <button
                             onClick={() => handleEdit(exp)}
                             title="تعديل السند"
@@ -275,7 +289,6 @@ export function ExpensesModule() {
                             <Edit className="w-4 h-4" />
                           </button>
 
-                          {/* Delete */}
                           <button
                             onClick={() => handleDelete(exp.id)}
                             title="حذف السند"
@@ -294,7 +307,6 @@ export function ExpensesModule() {
         </div>
       </div>
 
-      {/* Expense Form Modal */}
       <ExpenseFormModal
         isOpen={isFormOpen}
         onClose={() => {

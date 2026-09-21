@@ -16,13 +16,12 @@ export function PaymentModal({ isOpen, onClose }) {
   const { cartSummary, completeSale, storeSettings } = usePOS();
 
   const [amountReceived, setAmountReceived] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('نقداً'); // نقداً, بطاقة, آجل
+  const [paymentMethod, setPaymentMethod] = useState('نقداً');
   const [customerName, setCustomerName] = useState('');
   const [notes, setNotes] = useState('');
 
   const netTotal = cartSummary.netTotal;
 
-  // Whenever modal opens, initialize amountReceived to exact netTotal
   useEffect(() => {
     if (isOpen) {
       setAmountReceived(String(netTotal));
@@ -49,10 +48,6 @@ export function PaymentModal({ isOpen, onClose }) {
 
   const handleQuickCash = (val) => {
     setAmountReceived(String(val));
-  };
-
-  const handleAddCash = (increment) => {
-    setAmountReceived((prev) => String((Number(prev) || 0) + increment));
   };
 
   const handleSubmit = (e) => {

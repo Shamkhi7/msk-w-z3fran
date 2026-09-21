@@ -12,6 +12,8 @@ import {
   Volume2,
   Printer,
   ShieldAlert,
+  KeyRound,
+  Lock,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 
@@ -19,6 +21,7 @@ export function StoreSettingsModal({ isOpen, onClose }) {
   const {
     storeSettings,
     setStoreSettings,
+    updateManagerPin,
     exportSystemData,
     importSystemData,
     resetToFactoryDefaults,
@@ -27,6 +30,11 @@ export function StoreSettingsModal({ isOpen, onClose }) {
   const [formData, setFormData] = useState({ ...storeSettings });
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef(null);
+
+  // PIN Change State
+  const [currentPinInput, setCurrentPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [pinChangeStatus, setPinChangeStatus] = useState({ msg: '', isError: false });
 
   if (!isOpen) return null;
 
@@ -42,6 +50,18 @@ export function StoreSettingsModal({ isOpen, onClose }) {
     e.preventDefault();
     setStoreSettings(formData);
     onClose();
+  };
+
+  const handleUpdatePin = (e) => {
+    e.preventDefault();
+    const result = updateManagerPin(currentPinInput, newPinInput);
+    if (result.success) {
+      setPinChangeStatus({ msg: result.message, isError: false });
+      setCurrentPinInput('');
+      setNewPinInput('');
+    } else {
+      setPinChangeStatus({ msg: result.message, isError: true });
+    }
   };
 
   const handleFileUpload = (e) => {
@@ -72,7 +92,7 @@ export function StoreSettingsModal({ isOpen, onClose }) {
         <div className="bg-brand-800 text-white px-5 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Store className="w-5 h-5 text-gold-400" />
-            <h3 className="font-bold text-base">إعدادات المحل والنسخ الاحتياطي</h3>
+            <h3 className="font-bold text-base">إعدادات المحل وإدارة النظام</h3>
           </div>
           <button
             onClick={onClose}
@@ -213,6 +233,68 @@ export function StoreSettingsModal({ isOpen, onClose }) {
                 onChange={handleChange}
                 className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-800"
               />
+            </div>
+          </div>
+
+          {/* Manager Security PIN Management */}
+          <div className="space-y-3 pt-3 border-t border-stone-200">
+            <h4 className="text-xs font-black text-brand-900 border-b border-warm-200 pb-1 flex items-center gap-1.5">
+              <KeyRound className="w-4 h-4 text-brand-800" />
+              <span>إدارة رمز تأكيد المدير لتصفير الصندوق (Manager PIN)</span>
+            </h4>
+
+            <div className="bg-warm-100/60 p-3 rounded-xl border border-warm-200 space-y-2">
+              <p className="text-[11px] text-stone-600">
+                الرمز الافتراضي الحالي هو <strong>1234</strong>. يمكنك تغييره وتأمينه من هنا:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[10px] font-bold text-stone-700 mb-0.5">
+                    رمز المدير الحالي:
+                  </label>
+                  <input
+                    type="password"
+                    value={currentPinInput}
+                    onChange={(e) => setCurrentPinInput(e.target.value)}
+                    placeholder="الرمز الحالي..."
+                    className="w-full bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-brand-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-stone-700 mb-0.5">
+                    الرمز الجديد:
+                  </label>
+                  <input
+                    type="password"
+                    value={newPinInput}
+                    onChange={(e) => setNewPinInput(e.target.value)}
+                    placeholder="الرمز الجديد..."
+                    className="w-full bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-brand-800"
+                  />
+                </div>
+              </div>
+
+              {pinChangeStatus.msg && (
+                <div
+                  className={`text-[11px] font-bold py-1 px-2 rounded-lg ${
+                    pinChangeStatus.isError
+                      ? 'bg-rose-100 text-rose-800'
+                      : 'bg-emerald-100 text-emerald-800'
+                  }`}
+                >
+                  {pinChangeStatus.msg}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleUpdatePin}
+                className="bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold py-1.5 px-3 rounded-lg transition-colors cursor-pointer"
+              >
+                تحديث رمز المدير
+              </button>
             </div>
           </div>
 

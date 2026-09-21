@@ -26,12 +26,12 @@ export function ReservationFormModal({ isOpen, onClose }) {
   const numDeposit = Number(depositPaid) || 0;
   const remainingBalance = Math.max(0, numTotal - numDeposit);
 
+  // STRICTLY SIZES 0, 1, 2, 3 (SIZE 4 IS REMOVED)
   const cakeSizeGuides = [
     { size: '0', label: 'قياس 0', desc: 'شخصين (ميني)' },
     { size: '1', label: 'قياس 1', desc: '4-6 أشخاص' },
     { size: '2', label: 'قياس 2', desc: '8-10 أشخاص' },
     { size: '3', label: 'قياس 3', desc: '12-16 شخص' },
-    { size: '4', label: 'قياس 4', desc: 'طابقين ملكي' },
   ];
 
   const handleSubmit = (e) => {
@@ -119,9 +119,9 @@ export function ReservationFormModal({ isOpen, onClose }) {
           </div>
 
           {/* Delivery Date & Time */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-amber-50/70 p-3 rounded-xl border border-amber-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-warm-100/60 p-3 rounded-xl border border-warm-200">
             <div>
-              <label className="block text-xs font-bold text-amber-950 mb-1">
+              <label className="block text-xs font-bold text-stone-800 mb-1">
                 تاريخ الاستلام (Pickup Date):
               </label>
               <input
@@ -134,7 +134,7 @@ export function ReservationFormModal({ isOpen, onClose }) {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-amber-950 mb-1">
+              <label className="block text-xs font-bold text-stone-800 mb-1">
                 وقت الاستلام المتوقع:
               </label>
               <input
@@ -147,12 +147,12 @@ export function ReservationFormModal({ isOpen, onClose }) {
             </div>
           </div>
 
-          {/* Cake Size Selection (0 to 4) */}
+          {/* Cake Size Selection (STRICTLY 0 to 3) */}
           <div>
             <label className="block text-xs font-bold text-stone-700 mb-1.5">
-              قياس قالب الكيك (Cake Size):
+              قياس قالب الكيك (الخيارات المتاحة: 0، 1، 2، 3):
             </label>
-            <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {cakeSizeGuides.map((guide) => {
                 const isSelected = cakeSize === guide.size;
                 return (
@@ -160,14 +160,14 @@ export function ReservationFormModal({ isOpen, onClose }) {
                     key={guide.size}
                     type="button"
                     onClick={() => setCakeSize(guide.size)}
-                    className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer ${
+                    className={`py-3 px-2 rounded-xl border text-center transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-brand-800 text-white border-brand-950 shadow-md ring-2 ring-gold-500/50'
                         : 'bg-white text-stone-700 border-stone-200 hover:bg-warm-100'
                     }`}
                   >
-                    <div className="font-black text-xs sm:text-sm">{guide.label}</div>
-                    <div className={`text-[9px] truncate ${isSelected ? 'text-gold-300' : 'text-stone-400'}`}>
+                    <div className="font-black text-sm">{guide.label}</div>
+                    <div className={`text-[10px] truncate ${isSelected ? 'text-gold-300' : 'text-stone-500'}`}>
                       {guide.desc}
                     </div>
                   </button>
@@ -187,7 +187,7 @@ export function ReservationFormModal({ isOpen, onClose }) {
                 type="text"
                 value={writtenText}
                 onChange={(e) => setWrittenText(e.target.value)}
-                placeholder="مثال: كل عام وأنت بألف خير يا سارة ❤️"
+                placeholder="مثال: كل عام وأنت بألف خير يا سارة"
                 className="w-full bg-white border-2 border-stone-300 focus:border-brand-800 rounded-xl pr-9 pl-3 py-2 text-sm font-bold text-brand-900 focus:outline-none"
               />
             </div>
@@ -216,7 +216,7 @@ export function ReservationFormModal({ isOpen, onClose }) {
                 type="text"
                 value={cakeDesign}
                 onChange={(e) => setCakeDesign(e.target.value)}
-                placeholder="ورود طبيعية، مجسم سبايدرمان، إلخ..."
+                placeholder="ورود طبيعية، ألوان محددة، إلخ..."
                 className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-800"
               />
             </div>

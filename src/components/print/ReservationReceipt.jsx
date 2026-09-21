@@ -30,7 +30,7 @@ export function ReservationReceipt({ reservation, storeSettings }) {
           <span className="font-bold">رقم الهاتف:</span>
           <span className="font-mono">{reservation.phone}</span>
         </div>
-        <div className="flex justify-between bg-yellow-50 p-1 border border-dashed border-yellow-700 rounded">
+        <div className="flex justify-between bg-gray-50 p-1 border border-dashed border-gray-400 rounded">
           <span className="font-bold">موعد الاستلام:</span>
           <span className="font-bold text-[10.5px]">
             {reservation.pickupDate} ({reservation.pickupTime})
@@ -57,7 +57,7 @@ export function ReservationReceipt({ reservation, storeSettings }) {
         {reservation.writtenText && (
           <div className="bg-gray-50 p-1.5 border border-dashed border-black rounded">
             <span className="font-bold text-[9px] block text-gray-700">العبارة المطلوبة على الكيك:</span>
-            <div className="font-black text-center text-xs mt-0.5 text-red-950 font-serif">
+            <div className="font-black text-center text-xs mt-0.5 text-black font-serif">
               "{reservation.writtenText}"
             </div>
           </div>
@@ -84,11 +84,11 @@ export function ReservationReceipt({ reservation, storeSettings }) {
           <span>المبلغ الإجمالي للكيك:</span>
           <span className="font-mono font-bold">{reservation.totalCost.toLocaleString()} {storeSettings.currency}</span>
         </div>
-        <div className="flex justify-between text-green-700 font-semibold">
+        <div className="flex justify-between font-semibold">
           <span>العربون المقبوض:</span>
           <span className="font-mono">{reservation.depositPaid.toLocaleString()} {storeSettings.currency}</span>
         </div>
-        <div className="flex justify-between text-xs font-black pt-1 border-t border-black text-red-700">
+        <div className="flex justify-between text-xs font-black pt-1 border-t border-black">
           <span>المبلغ المتبقي عند الاستلام:</span>
           <span className="font-mono">{reservation.remainingBalance.toLocaleString()} {storeSettings.currency}</span>
         </div>

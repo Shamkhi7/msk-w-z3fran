@@ -10,7 +10,11 @@ export function ZReportReceipt({ report, storeSettings }) {
     return `${d.toLocaleDateString('ar-IQ')} ${d.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}`;
   };
 
-  const totalInflows = (report.directSales || 0) + (report.collectedDeposits || 0);
+  const directSales = report.directSales || 0;
+  const salesReturns = report.salesReturns || 0;
+  const collectedDeposits = report.collectedDeposits || 0;
+  const dailyExpenses = report.dailyExpenses || 0;
+  const netInflows = (directSales - salesReturns) + collectedDeposits;
 
   return (
     <div className="receipt-container text-black bg-white select-none">
@@ -50,29 +54,36 @@ export function ZReportReceipt({ report, storeSettings }) {
           ملخص حركة النقدية اليومية
         </div>
 
-        {/* Inflows */}
+        {/* Inflows & Sales */}
         <div className="space-y-1">
           <div className="flex justify-between text-gray-800">
             <span>1. إجمالي المبيعات المباشرة:</span>
-            <span className="font-mono font-bold">{(report.directSales || 0).toLocaleString()} {storeSettings.currency}</span>
+            <span className="font-mono font-bold">{directSales.toLocaleString()} {storeSettings.currency}</span>
           </div>
 
-          <div className="flex justify-between text-emerald-800 bg-emerald-50 px-1 py-0.5 rounded border border-dashed border-emerald-300">
+          {salesReturns > 0 && (
+            <div className="flex justify-between text-red-700">
+              <span>مردود ومسترجع مبيعات (-):</span>
+              <span className="font-mono font-bold">-{salesReturns.toLocaleString()} {storeSettings.currency}</span>
+            </div>
+          )}
+
+          <div className="flex justify-between">
             <span>2. مقبوضات العربون (مفصلة):</span>
-            <span className="font-mono font-bold">+{(report.collectedDeposits || 0).toLocaleString()} {storeSettings.currency}</span>
+            <span className="font-mono font-bold">+{collectedDeposits.toLocaleString()} {storeSettings.currency}</span>
           </div>
 
-          <div className="flex justify-between font-bold text-[10.5px] border-t border-dotted border-gray-400 pt-0.5">
-            <span>إجمالي المقبوضات (1 + 2):</span>
-            <span className="font-mono">{totalInflows.toLocaleString()} {storeSettings.currency}</span>
+          <div className="flex justify-between font-bold text-[10px] border-t border-dotted border-gray-400 pt-0.5">
+            <span>إجمالي المقبوضات الصافية:</span>
+            <span className="font-mono">{netInflows.toLocaleString()} {storeSettings.currency}</span>
           </div>
         </div>
 
         {/* Outflows */}
         <div className="space-y-1 pt-1 border-t border-dashed border-black">
-          <div className="flex justify-between text-rose-800 bg-rose-50 px-1 py-0.5 rounded border border-dashed border-rose-300">
+          <div className="flex justify-between">
             <span>3. إجمالي الصرفيات اليومية:</span>
-            <span className="font-mono font-bold">-{(report.dailyExpenses || 0).toLocaleString()} {storeSettings.currency}</span>
+            <span className="font-mono font-bold">-{dailyExpenses.toLocaleString()} {storeSettings.currency}</span>
           </div>
         </div>
 
@@ -93,11 +104,11 @@ export function ZReportReceipt({ report, storeSettings }) {
       {/* Counts & Statistics */}
       <div className="py-2 border-b border-dashed border-black grid grid-cols-2 gap-2 text-center text-[9.5px]">
         <div className="bg-gray-50 p-1 border border-gray-200 rounded">
-          <span className="text-gray-600 block text-[8.5px]">عدد فواتير البيع:</span>
+          <span className="text-gray-600 block text-[8.5px]">فواتير البيع:</span>
           <span className="font-mono font-bold text-xs">{report.salesCount || 0}</span>
         </div>
         <div className="bg-gray-50 p-1 border border-gray-200 rounded">
-          <span className="text-gray-600 block text-[8.5px]">عدد سندات الصرف:</span>
+          <span className="text-gray-600 block text-[8.5px]">سندات الصرف:</span>
           <span className="font-mono font-bold text-xs">{report.expensesCount || 0}</span>
         </div>
       </div>

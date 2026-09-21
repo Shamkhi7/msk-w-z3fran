@@ -9,8 +9,16 @@ export function ZReportConfirmationModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  const { directSales, collectedDeposits, dailyExpenses, netCash, salesCount, expensesCount } = dailyTreasury;
-  const totalInflows = directSales + collectedDeposits;
+  const {
+    directSales,
+    salesReturnsTotal,
+    collectedDeposits,
+    dailyExpenses,
+    netCash,
+    salesCount,
+    expensesCount,
+    returnsCount,
+  } = dailyTreasury;
 
   const handleConfirmClose = () => {
     closeDayAndResetDrawer(closingNotes);
@@ -45,7 +53,7 @@ export function ZReportConfirmationModal({ isOpen, onClose }) {
           <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-start gap-2.5 text-amber-900">
             <AlertTriangle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
             <div className="text-xs leading-relaxed">
-              <strong>تأكيد العملية:</strong> عند المتابعة، سيتم تصفير عدادات المبيعات والصرفيات النشطة لليومية الحالية (إلى 0) لبدء يوم جديد، مع <strong>طباعة تقرير Z تلقائياً</strong> وأرشفة الأرقام دون حذف الفواتير التاريخية.
+              <strong>تأكيد العملية:</strong> تم التحقق من رمز تأكيد المدير بنجاح. عند المتابعة، سيتم تصفير عدادات المبيعات، المردودات، والصرفيات النشطة للوردية الحالية لبدء يوم جديد، مع <strong>طباعة تقرير Z تلقائياً</strong> وأرشفة الأرقام دون حذف الفواتير التاريخية.
             </div>
           </div>
 
@@ -62,6 +70,15 @@ export function ZReportConfirmationModal({ isOpen, onClose }) {
                   {directSales.toLocaleString()} {storeSettings.currency}
                 </span>
               </div>
+
+              {salesReturnsTotal > 0 && (
+                <div className="flex justify-between text-rose-700 font-bold">
+                  <span>مردود ومسترجع مبيعات (-):</span>
+                  <span className="font-mono">
+                    -{salesReturnsTotal.toLocaleString()} {storeSettings.currency}
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-between text-emerald-800">
                 <span>مقبوضات العربون (مفصلة):</span>
@@ -108,7 +125,6 @@ export function ZReportConfirmationModal({ isOpen, onClose }) {
             />
           </div>
 
-          {/* Safety Checkpoint Guarantee */}
           <div className="flex items-center gap-2 text-[11px] text-stone-500 font-medium">
             <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
             <span>السجلات السابقة وسندات الصرف تظل محفوظة دائمًا في الأرشيف الدائم.</span>
