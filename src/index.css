@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Custom subtle scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f1ede4;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #c7a77b;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #800020;
+  }
+}
+
+/* 
+ * ==========================================================================
+ * THERMAL PRINTING SPECIFICATIONS (STRICT 72.1mm PRINTABLE WIDTH FOR 80mm ROLL)
+ * ==========================================================================
+ */
+@page {
+  size: 80mm auto;
+  margin: 0mm;
+}
+
+.receipt-container {
+  width: 72.1mm !important;
+  max-width: 72.1mm !important;
+  margin: 0 auto !important;
+  padding: 1.5mm 1mm !important;
+  box-sizing: border-box !important;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #000;
+  background: #fff;
+  font-family: 'Cairo', monospace, sans-serif;
+  direction: rtl;
+}
+
+@media print {
+  html, body {
+    width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Completely hide all UI elements when printing */
+  .no-print,
+  #app-screen-root,
+  nav,
+  header,
+  aside,
+  button:not(.allow-print) {
+    display: none !important;
+  }
+
+  /* Show only the isolated print portal */
+  #thermal-print-area {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .receipt-container {
+    width: 72.1mm !important;
+    max-width: 72.1mm !important;
+    margin: 0 auto !important;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+@media screen {
+  #thermal-print-area.hidden-on-screen {
+    display: none;
+  }
+}
