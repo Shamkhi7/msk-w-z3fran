@@ -366,7 +366,8 @@ export const DEFAULT_STORE_SETTINGS = {
   currency: 'د.ع',
   taxRate: 0,
   cashierName: 'كاشير مسك 1',
-  managerPin: '1234', // Default Manager PIN
+  managerPin: '1234', // Default Manager Profile Login PIN
+  resetPin: '9999',   // Dedicated End-of-Day / Shift Reset PIN
   receiptFooterNote: 'شكراً لاختياركم مسك وزعفران | يسعدنا تقييمكم وزيارتكم مجدداً',
   allowSound: true,
   autoPrintReceiptOnPayment: true,
@@ -421,6 +422,7 @@ export const INITIAL_EXPENSES = [
     description: 'شراء قشطة طازجة 5 كغم وحليب مكثف محلى',
     date: new Date().toISOString(),
     recordedBy: 'مسؤول المشتريات',
+    shiftType: 'صباحي',
   },
   {
     id: 'EXP-102',
@@ -430,6 +432,193 @@ export const INITIAL_EXPENSES = [
     recipient: 'مكتبة ومستلزمات الفرات',
     description: 'شراء رولات حرارية 80 ملم وأقلام ومستلزمات مكتبية',
     date: new Date().toISOString(),
-    recordedBy: 'الكاشير',
+    recordedBy: 'كاشير 2',
+    shiftType: 'مسائي',
   }
 ];
+
+const now = Date.now();
+const dayMs = 86400000;
+
+export const INITIAL_SALES_HISTORY = [
+  {
+    id: 'SALE-1001',
+    receiptNo: 'INV-2026-1001',
+    sessionId: 'SESSION-' + new Date().toISOString().split('T')[0],
+    date: new Date(now - 3600000 * 2).toISOString(), // 2 hours ago (Today - Evening)
+    customerName: 'سارة العبيدي',
+    cashierName: 'كاشير 2',
+    shiftType: 'مسائي',
+    paymentMethod: 'نقداً',
+    subtotal: 36000,
+    totalDiscount: 0,
+    netTotal: 36000,
+    items: [
+      {
+        cartItemId: 'item-1',
+        product: { id: 'prod-cake-1', name: 'كيكة شوكولاتة بلجيكية فاخرة', category: 'cat-cakes', price: 25000 },
+        quantity: 1,
+        unitPrice: 25000,
+        discount: 0,
+      },
+      {
+        cartItemId: 'item-2',
+        product: { id: 'prod-sweet-1', name: 'تشيز كيك فستق حلبي', category: 'cat-sweets', price: 5500 },
+        quantity: 2,
+        unitPrice: 5500,
+        discount: 0,
+      },
+    ],
+  },
+  {
+    id: 'SALE-1002',
+    receiptNo: 'INV-2026-1002',
+    sessionId: 'SESSION-' + new Date().toISOString().split('T')[0],
+    date: new Date(now - 3600000 * 4).toISOString(), // 4 hours ago (Today - Morning)
+    customerName: 'عمر التميمي',
+    cashierName: 'كاشير 1',
+    shiftType: 'صباحي',
+    paymentMethod: 'نقداً',
+    subtotal: 28000,
+    totalDiscount: 0,
+    netTotal: 28000,
+    items: [
+      {
+        cartItemId: 'item-3',
+        product: { id: 'prod-sweet-2', name: 'صندوق بقلاوة ملكية مشكلة (1 كغم)', category: 'cat-sweets', price: 22000 },
+        quantity: 1,
+        unitPrice: 22000,
+        discount: 0,
+      },
+      {
+        cartItemId: 'item-4',
+        product: { id: 'prod-juice-1', name: 'عصير رمان وزعفران ملكي فريش', category: 'cat-drinks', price: 3000 },
+        quantity: 2,
+        unitPrice: 3000,
+        discount: 0,
+      },
+    ],
+  },
+  {
+    id: 'SALE-1003',
+    receiptNo: 'INV-2026-1003',
+    sessionId: 'SESSION-PAST-1',
+    date: new Date(now - dayMs * 1.5).toISOString(), // Yesterday (This Week)
+    customerName: 'فاطمة الكرخي',
+    cashierName: 'كاشير 2',
+    shiftType: 'مسائي',
+    paymentMethod: 'بطاقة إلكترونية',
+    subtotal: 42000,
+    totalDiscount: 2000,
+    netTotal: 40000,
+    items: [
+      {
+        cartItemId: 'item-5',
+        product: { id: 'prod-cake-2', name: 'كيكة رد فلفت كلاسيك', category: 'cat-cakes', price: 24000 },
+        quantity: 1,
+        unitPrice: 24000,
+        discount: 0,
+      },
+      {
+        cartItemId: 'item-6',
+        product: { id: 'prod-mousse-1', name: 'قدح موس شوكولاتة نوتيلا', category: 'cat-mousse', price: 4000 },
+        quantity: 3,
+        unitPrice: 4000,
+        discount: 0,
+      },
+      {
+        cartItemId: 'item-7',
+        product: { id: 'prod-pastry-1', name: 'كرواسون زبدة فرنسي فاخر', category: 'cat-pastries', price: 2000 },
+        quantity: 3,
+        unitPrice: 2000,
+        discount: 0,
+      },
+    ],
+  },
+  {
+    id: 'SALE-1004',
+    receiptNo: 'INV-2026-1004',
+    sessionId: 'SESSION-PAST-2',
+    date: new Date(now - dayMs * 3).toISOString(), // 3 days ago (This Week)
+    customerName: 'حسين الخفاجي',
+    cashierName: 'كاشير 1',
+    shiftType: 'صباحي',
+    paymentMethod: 'نقداً',
+    subtotal: 62000,
+    totalDiscount: 0,
+    netTotal: 62000,
+    items: [
+      {
+        cartItemId: 'item-8',
+        product: { id: 'prod-cake-1', name: 'كيكة شوكولاتة بلجيكية فاخرة', category: 'cat-cakes', price: 25000 },
+        quantity: 2,
+        unitPrice: 25000,
+        discount: 0,
+      },
+      {
+        cartItemId: 'item-9',
+        product: { id: 'prod-mousse-2', name: 'موس كيك اللوتس المقرمش', category: 'cat-mousse', price: 4000 },
+        quantity: 3,
+        unitPrice: 4000,
+        discount: 0,
+      },
+    ],
+  },
+  {
+    id: 'SALE-1005',
+    receiptNo: 'INV-2026-1005',
+    sessionId: 'SESSION-PAST-3',
+    date: new Date(now - dayMs * 12).toISOString(), // 12 days ago (This Month)
+    customerName: 'د. ليث الربيعي',
+    cashierName: 'كاشير 1',
+    shiftType: 'صباحي',
+    paymentMethod: 'نقداً',
+    subtotal: 75000,
+    totalDiscount: 5000,
+    netTotal: 70000,
+    items: [
+      {
+        cartItemId: 'item-10',
+        product: { id: 'prod-sweet-2', name: 'صندوق بقلاوة ملكية مشكلة (1 كغم)', category: 'cat-sweets', price: 22000 },
+        quantity: 2,
+        unitPrice: 22000,
+        discount: 0,
+      },
+      {
+        cartItemId: 'item-11',
+        product: { id: 'prod-sweet-1', name: 'تشيز كيك فستق حلبي', category: 'cat-sweets', price: 5500 },
+        quantity: 4,
+        unitPrice: 5500,
+        discount: 0,
+      },
+      {
+        cartItemId: 'item-12',
+        product: { id: 'prod-juice-1', name: 'عصير رمان وزعفران ملكي فريش', category: 'cat-drinks', price: 3000 },
+        quantity: 3,
+        unitPrice: 3000,
+        discount: 0,
+      },
+    ],
+  },
+];
+
+export const DEFAULT_PRESET_EXPENSES = [
+  { id: 'pre-1', title: 'شراء ثلج', category: 'نسريات ومصاريف يومية', defaultAmount: 5000 },
+  { id: 'pre-2', title: 'بنزين للمولدة', category: 'فواتير وكهرباء وماء', defaultAmount: 25000 },
+  { id: 'pre-3', title: 'أدوات ومواد نظافة', category: 'نسريات ومصاريف يومية', defaultAmount: 10000 },
+  { id: 'pre-4', title: 'وجبة غداء للعمال', category: 'رواتب وأجور', defaultAmount: 15000 },
+  { id: 'pre-5', title: 'شراء رولات حرارية وأقلام', category: 'نسريات ومصاريف يومية', defaultAmount: 8000 },
+  { id: 'pre-6', title: 'شراء حليب وقشطة طازجة', category: 'مواد أولية', defaultAmount: 0 },
+  { id: 'pre-7', title: 'صيانة وتصليح معدات', category: 'صيانة ومعدات', defaultAmount: 0 },
+  { id: 'pre-8', title: 'أكياس وتغليف معجنات', category: 'مواد أولية', defaultAmount: 12000 },
+];
+
+export const DEFAULT_EXPENSE_CATEGORIES = [
+  'مواد أولية',
+  'نسريات ومصاريف يومية',
+  'رواتب وأجور',
+  'صيانة ومعدات',
+  'فواتير وكهرباء وماء',
+  'أخرى',
+];
+

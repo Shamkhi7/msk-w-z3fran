@@ -8,11 +8,12 @@ import {
   Printer,
   Calculator,
   User,
+  Zap,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
 
-export function PaymentModal({ isOpen, onClose }) {
+export function PaymentModal({ isOpen, onClose, onFastSuccess }) {
   const { cartSummary, completeSale, storeSettings } = usePOS();
 
   const [amountReceived, setAmountReceived] = useState('');
@@ -31,8 +32,6 @@ export function PaymentModal({ isOpen, onClose }) {
     }
   }, [isOpen, netTotal]);
 
-  if (!isOpen) return null;
-
   const numReceived = Number(amountReceived) || 0;
   const changeDue = Math.max(0, numReceived - netTotal);
   const isShortage = numReceived < netTotal && paymentMethod === 'نقداً';
@@ -50,23 +49,71 @@ export function PaymentModal({ isOpen, onClose }) {
     setAmountReceived(String(val));
   };
 
+  // Submit with Thermal Receipt Printing
   const handleSubmit = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (isShortage) {
       alert('المبلغ المستلم أقل من المبلغ المطلوب للطلب!');
       return;
     }
 
-    completeSale({
-      amountReceived: numReceived,
-      changeDue,
-      paymentMethod,
-      customerName: customerName.trim() || 'زبون عام',
-      notes: notes.trim(),
-    });
+    completeSale(
+      {
+        amountReceived: numReceived,
+        changeDue,
+        paymentMethod,
+        customerName: customerName.trim() || 'زبون عام',
+        notes: notes.trim(),
+        printReceipt: true,
+      },
+      true
+    );
 
     onClose();
   };
+
+  // Fast Checkout Without Printing
+  const handleNoPrintCheckout = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (isShortage) {
+      alert('المبلغ المستلم أقل من المبلغ المطلوب للطلب!');
+      return;
+    }
+
+    completeSale(
+      {
+        amountReceived: numReceived,
+        changeDue,
+        paymentMethod,
+        customerName: customerName.trim() || 'زبون عام',
+        notes: notes.trim(),
+        printReceipt: false,
+      },
+      false
+    );
+
+    onClose();
+    if (onFastSuccess) {
+      onFastSuccess('تم تسجيل البيع بنجاح (بدون طباعة)');
+    }
+  };
+
+  // Keyboard shortcut listener inside Payment Modal (Shift+Enter for Fast Checkout)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e) => {
+      if (e.shiftKey && e.key === 'Enter') {
+        e.preventDefault();
+        handleNoPrintCheckout();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isShortage, numReceived, changeDue, paymentMethod, customerName, notes]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in select-none">
@@ -233,23 +280,42 @@ export function PaymentModal({ isOpen, onClose }) {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2.5 pt-2 border-t border-stone-200">
+          <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-stone-200">
+            {/* 1. Pay and Print Receipt (Primary) */}
             <button
               type="submit"
               disabled={isShortage}
-              className={`flex-1 font-black py-3.5 px-4 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] ${
+              className={`flex-1 font-black py-3 px-3 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] ${
                 isShortage
                   ? 'bg-stone-300 text-stone-500 cursor-not-allowed'
-                  : 'bg-brand-800 hover:bg-brand-900 text-white shadow-brand-900/30 hover:shadow-lg cursor-pointer'
+                  : 'bg-brand-800 hover:bg-brand-900 text-white shadow-brand-900/30 hover:shadow-lg cursor-pointer border border-gold-500/30'
               }`}
             >
-              <Printer className="w-5 h-5 text-gold-400" />
-              <span>إتمام الدفع وطباعة الوصل (72.1mm)</span>
+              <Printer className="w-4 h-4 text-gold-400 shrink-0" />
+              <span>إتمام الدفع وطباعة الوصل</span>
             </button>
+
+            {/* 2. Fast Checkout Without Printing */}
+            <button
+              type="button"
+              disabled={isShortage}
+              onClick={handleNoPrintCheckout}
+              title="تسجيل البيع فوراً بدون إرسال أمر طباعة (Shift+Enter)"
+              className={`flex-1 font-black py-3 px-3 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] ${
+                isShortage
+                  ? 'bg-stone-300 text-stone-500 cursor-not-allowed'
+                  : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-emerald-900/30 hover:shadow-lg cursor-pointer border border-emerald-600/50'
+              }`}
+            >
+              <Zap className="w-4 h-4 text-emerald-200 shrink-0" />
+              <span>دفع بدون طباعة (Shift+↵)</span>
+            </button>
+
+            {/* 3. Cancel */}
             <button
               type="button"
               onClick={onClose}
-              className="px-5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl transition-colors text-sm cursor-pointer"
+              className="px-4 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl transition-colors text-xs sm:text-sm cursor-pointer"
             >
               إلغاء
             </button>

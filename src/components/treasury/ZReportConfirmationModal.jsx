@@ -4,7 +4,7 @@ import { usePOS } from '../../context/POSContext';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
 
 export function ZReportConfirmationModal({ isOpen, onClose }) {
-  const { dailyTreasury, closeDayAndResetDrawer, storeSettings } = usePOS();
+  const { dailyTreasury, closeDayAndResetDrawer, storeSettings, printXReport } = usePOS();
   const [closingNotes, setClosingNotes] = useState('');
 
   if (!isOpen) return null;
@@ -131,17 +131,26 @@ export function ZReportConfirmationModal({ isOpen, onClose }) {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2.5 pt-2 border-t border-stone-200">
+          <div className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-stone-200">
+            <button
+              type="button"
+              onClick={() => printXReport()}
+              title="معاينة مبيعات اليوم على طابعة الإيصالات دون تصفير الصندوق"
+              className="bg-gold-500 hover:bg-gold-400 text-stone-950 font-black py-3 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-98 border border-gold-400"
+            >
+              <Printer className="w-4 h-4 text-stone-950" />
+              <span>طباعة مبيعات اليوم (معاينة)</span>
+            </button>
             <button
               onClick={handleConfirmClose}
-              className="flex-1 bg-brand-800 hover:bg-brand-900 text-white font-black py-3.5 px-4 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-brand-900/30 transition-all cursor-pointer active:scale-98"
+              className="flex-1 bg-brand-800 hover:bg-brand-900 text-white font-black py-3 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-brand-900/30 transition-all cursor-pointer active:scale-98"
             >
-              <Printer className="w-5 h-5 text-gold-400" />
-              <span>تأكيد الإغلاق، تصفير الصندوق، وطباعة Z-Report</span>
+              <Check className="w-4 h-4 text-gold-400" />
+              <span>تأكيد الإغلاق وتصفير الصندوق (Z)</span>
             </button>
             <button
               onClick={onClose}
-              className="px-5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl transition-colors text-sm cursor-pointer"
+              className="px-4 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl transition-colors text-xs sm:text-sm cursor-pointer"
             >
               تراجع
             </button>

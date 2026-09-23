@@ -5,6 +5,12 @@ node_modules/
 dist/
 dist-ssr/
 
+# Electron desktop build output & installers
+dist-desktop/
+release/
+*.exe
+SHOP_PACKAGE_*/
+
 # Environment variables
 .env
 .env.local

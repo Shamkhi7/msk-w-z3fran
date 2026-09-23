@@ -6,6 +6,7 @@ export function ProductEditModal({ product, isOpen, onClose }) {
   const { updateProduct, deleteProduct, storeSettings } = usePOS();
 
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [isAvailable, setIsAvailable] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -13,6 +14,7 @@ export function ProductEditModal({ product, isOpen, onClose }) {
   useEffect(() => {
     if (product) {
       setName(product.name || '');
+      setDescription(product.description || '');
       setPrice(product.price !== undefined ? product.price : '');
       setIsAvailable(product.isAvailable !== false);
       setShowDeleteConfirm(false);
@@ -28,6 +30,7 @@ export function ProductEditModal({ product, isOpen, onClose }) {
 
     updateProduct(product.id, {
       name: name.trim() || product.name,
+      description: description.trim(),
       price: parsedPrice,
       isAvailable,
     });
@@ -73,6 +76,19 @@ export function ProductEditModal({ product, isOpen, onClose }) {
               onChange={(e) => setName(e.target.value)}
               className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-800"
               required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-stone-700 mb-1">
+              الوصف / ملاحظة الصنف (اختياري):
+            </label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="مثال: يكفي شخصين إلى ثلاثة أو شوكولاتة بلجيكية فاخرة"
+              className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-800"
             />
           </div>
 

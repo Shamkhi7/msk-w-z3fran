@@ -1,5 +1,6 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
+import { ReceiptBrandingFooter } from './ReceiptBrandingFooter';
 
 export function ExpenseVoucherReceipt({ expense, storeSettings }) {
   if (!expense) return null;
@@ -56,17 +57,10 @@ export function ExpenseVoucherReceipt({ expense, storeSettings }) {
       </div>
 
       {/* Details */}
-      <div className="py-2 border-b-2 border-black space-y-2 text-[10.5px] text-black">
-        <div>
-          <span className="font-black block">يصرف إلى السيد:</span>
-          <div className="font-black text-xs pr-1 mt-0.5 border border-black p-1">
-            {expense.recipient || 'غير محدد'}
-          </div>
-        </div>
-
+      <div className="py-2 border-b-2 border-black space-y-1 text-[10.5px] text-black">
         <div>
           <span className="font-black block">البيان / السبب:</span>
-          <div className="font-bold text-[10px] pr-1 mt-0.5 leading-relaxed">
+          <div className="font-black text-xs pr-1 mt-0.5 leading-relaxed">
             {expense.description}
           </div>
         </div>
@@ -76,6 +70,9 @@ export function ExpenseVoucherReceipt({ expense, storeSettings }) {
       <div className="pt-2 text-center text-[9px] font-bold text-black font-mono">
         سند صرف رسمي مسجل بالنظام • مسك وزعفران
       </div>
+
+      {/* Universal Footer Branding */}
+      <ReceiptBrandingFooter />
     </div>
   );
 }

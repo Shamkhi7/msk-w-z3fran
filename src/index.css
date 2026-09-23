@@ -3,9 +3,50 @@
 @tailwind utilities;
 
 @layer base {
+  html, body {
+    height: 100%;
+    width: 100%;
+    overflow-x: hidden !important;
+  }
+
   body {
     font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Adaptive root rem scaling for POS monitors & compact screens */
+  @media screen and (max-width: 1440px) {
+    html {
+      font-size: 15px;
+    }
+  }
+
+  @media screen and (max-width: 1280px) {
+    html {
+      font-size: 14px;
+    }
+  }
+
+  @media screen and (max-width: 1024px) {
+    html {
+      font-size: 13px;
+    }
+  }
+
+  @media screen and (max-width: 900px) {
+    html {
+      font-size: 12px;
+    }
+  }
+
+  input, textarea, select {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    pointer-events: auto !important;
+  }
+
+  button {
+    pointer-events: auto !important;
   }
 
   /* Custom subtle scrollbars */
@@ -47,15 +88,32 @@
   background: #fff !important;
   font-family: 'Cairo', monospace, sans-serif;
   direction: rtl;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+.receipt-badge-dark {
+  background-color: #fff !important;
+  color: #000 !important;
+  border: 2px solid #000 !important;
+  font-weight: 900 !important;
 }
 
 @media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   html, body {
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
     color: #000 !important;
     width: 80mm !important;
+    font-size: 16px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* 1. Hide entire regular application layout during print */
@@ -67,6 +125,8 @@
   .print-only,
   .print-only * {
     visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* 3. Position the printable container firmly at top-left with strict 72.1mm width */
@@ -90,5 +150,22 @@
     box-sizing: border-box !important;
     page-break-after: avoid;
     page-break-inside: avoid;
+    background-color: #fff !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .receipt-container .bg-black,
+  .receipt-badge-dark {
+    background-color: #fff !important;
+    color: #000 !important;
+    border: 2px solid #000 !important;
+  }
+
+  .receipt-container .text-white {
+    color: #000 !important;
   }
 }
+
+

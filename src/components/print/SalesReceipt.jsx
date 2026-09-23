@@ -1,5 +1,6 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
+import { ReceiptBrandingFooter } from './ReceiptBrandingFooter';
 
 export function SalesReceipt({ sale, storeSettings }) {
   if (!sale) return null;
@@ -52,7 +53,7 @@ export function SalesReceipt({ sale, storeSettings }) {
         <table className="w-full text-right text-[10px]">
           <thead>
             <tr className="border-b-2 border-black font-black">
-              <th className="py-1 w-7 text-center">العدد</th>
+              <th className="py-1 w-11 text-center">الكمية</th>
               <th className="py-1">الصنف</th>
               <th className="py-1 text-center">السعر</th>
               <th className="py-1 text-left">الإجمالي</th>
@@ -60,12 +61,20 @@ export function SalesReceipt({ sale, storeSettings }) {
           </thead>
           <tbody className="divide-y divide-black">
             {sale.items.map((item, idx) => {
-              const lineTotal = Math.max(0, item.unitPrice * item.quantity - (item.discount || 0));
+              const lineTotal = Math.max(0, Math.round(item.unitPrice * item.quantity - (item.discount || 0)));
+              const isFractional = item.quantity % 1 !== 0;
               return (
                 <tr key={idx} className="align-top">
-                  <td className="py-1.5 text-center font-black font-mono">{item.quantity}</td>
+                  <td className="py-1.5 text-center font-black font-mono whitespace-nowrap">
+                    {isFractional ? `${item.quantity} كغم` : item.quantity}
+                  </td>
                   <td className="py-1.5 pr-1">
                     <div className="font-black leading-tight text-black">{item.product.name}</div>
+                    <div className="text-[9px] text-black font-mono font-bold">
+                      {isFractional
+                        ? `${item.quantity} كغم × ${item.unitPrice.toLocaleString()}`
+                        : `${item.quantity} × ${item.unitPrice.toLocaleString()}`}
+                    </div>
                     {item.isOverridden && (
                       <div className="text-[9px] text-black font-bold">
                         (سعر خاص - الأصلي: {item.originalPrice.toLocaleString()})
@@ -136,6 +145,9 @@ export function SalesReceipt({ sale, storeSettings }) {
           {storeSettings.receiptFooterNote}
         </div>
       </div>
+
+      {/* Universal Footer Branding */}
+      <ReceiptBrandingFooter />
     </div>
   );
 }

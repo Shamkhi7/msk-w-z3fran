@@ -6,6 +6,7 @@ export function AddProductModal({ isOpen, onClose, defaultCategoryId }) {
   const { addProduct, categories, storeSettings } = usePOS();
 
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState(
     defaultCategoryId ? defaultCategoryId : 'cat-cakes'
   );
@@ -21,6 +22,7 @@ export function AddProductModal({ isOpen, onClose, defaultCategoryId }) {
 
     addProduct({
       name: name.trim(),
+      description: description.trim(),
       categoryId,
       price: Number(price),
       cost: Number(cost) || 0,
@@ -28,6 +30,7 @@ export function AddProductModal({ isOpen, onClose, defaultCategoryId }) {
     });
 
     setName('');
+    setDescription('');
     setPrice('');
     setCost('');
     onClose();
@@ -62,6 +65,19 @@ export function AddProductModal({ isOpen, onClose, defaultCategoryId }) {
               className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-800"
               autoFocus
               required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-stone-700 mb-1">
+              الوصف / ملاحظة الصنف (اختياري):
+            </label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="مثال: يكفي شخصين إلى ثلاثة أو شوكولاتة بلجيكية فاخرة"
+              className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-800"
             />
           </div>
 

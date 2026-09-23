@@ -8,12 +8,16 @@ export function ManagerPinModal({
   onSuccess,
   title = 'رمز تأكيد المدير',
   promptMessage = 'أدخل رمز تأكيد المدير للمتابعة',
+  expectedPin = null,
 }) {
   const { storeSettings } = usePOS();
   const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const targetPin = storeSettings.managerPin || '1234';
+  const targetPin =
+    expectedPin !== null && expectedPin !== undefined
+      ? String(expectedPin).trim()
+      : String(storeSettings.managerPin || '1234').trim();
 
   useEffect(() => {
     if (isOpen) {

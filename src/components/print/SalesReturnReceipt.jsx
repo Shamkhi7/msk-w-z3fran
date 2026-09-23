@@ -1,5 +1,6 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
+import { ReceiptBrandingFooter } from './ReceiptBrandingFooter';
 
 export function SalesReturnReceipt({ returnData, storeSettings }) {
   if (!returnData) return null;
@@ -23,7 +24,7 @@ export function SalesReturnReceipt({ returnData, storeSettings }) {
       <div className="text-center pb-2 border-b-2 border-black">
         <div className="text-base font-black tracking-wide text-black">{storeSettings.storeNameAr}</div>
         <div className="text-[11px] font-bold tracking-wider text-black">{storeSettings.storeNameEn}</div>
-        <div className="text-xs font-black bg-black text-white px-3 py-0.5 mt-1.5 inline-block">
+        <div className="text-xs font-black bg-white text-black border-2 border-black px-3 py-1 mt-1.5 inline-block">
           وصل مردود مبيعات (إرجاع نقدي)
         </div>
         <div className="text-[10px] mt-1 font-mono font-bold text-black">{storeSettings.phone}</div>
@@ -114,6 +115,9 @@ export function SalesReturnReceipt({ returnData, storeSettings }) {
           {storeSettings.receiptFooterNote}
         </div>
       </div>
+
+      {/* Universal Footer Branding */}
+      <ReceiptBrandingFooter />
     </div>
   );
 }

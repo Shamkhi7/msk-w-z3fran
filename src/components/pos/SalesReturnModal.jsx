@@ -7,16 +7,18 @@ export function SalesReturnModal({ isOpen, onClose }) {
   const { products, addSalesReturn, storeSettings } = usePOS();
 
   const [selectedProductId, setSelectedProductId] = useState('');
+  const [returnQty, setReturnQty] = useState('1');
   const [returnAmount, setReturnAmount] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [originalReceiptNo, setOriginalReceiptNo] = useState('');
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState('إرجاع صنف ومسترجع نقدي');
 
   if (!isOpen) return null;
 
   const handleProductSelect = (e) => {
     const prodId = e.target.value;
     setSelectedProductId(prodId);
+    setReturnQty('1');
     if (prodId) {
       const prod = products.find((p) => p.id === prodId);
       if (prod) {
@@ -35,12 +37,15 @@ export function SalesReturnModal({ isOpen, onClose }) {
     }
 
     const selectedProduct = products.find((p) => p.id === selectedProductId);
+    const qty = selectedProduct ? (parseFloat(returnQty) || 1) : 1;
     const returnItems = selectedProduct
       ? [
           {
             id: selectedProduct.id,
             name: selectedProduct.name,
-            quantity: 1,
+            category: selectedProduct.category,
+            quantity: qty,
+            unitPrice: selectedProduct.price,
             price: numAmount,
           },
         ]
@@ -96,6 +101,42 @@ export function SalesReturnModal({ isOpen, onClose }) {
                 ))}
             </select>
           </div>
+
+          {/* Return Quantity & Price per Unit when a Product is selected */}
+          {selectedProductId && (
+            <div className="grid grid-cols-2 gap-2.5 bg-stone-100/80 p-2.5 rounded-xl border border-stone-200 animate-fade-in">
+              <div>
+                <label className="block text-[11px] font-bold text-stone-700 mb-1">
+                  الكمية المرتجعة (كغم أو عدد):
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0.01"
+                  value={returnQty}
+                  onChange={(e) => {
+                    const newQty = e.target.value;
+                    setReturnQty(newQty);
+                    const prod = products.find((p) => p.id === selectedProductId);
+                    if (prod && newQty && !isNaN(parseFloat(newQty))) {
+                      const calculated = Math.round(prod.price * parseFloat(newQty));
+                      setReturnAmount(String(calculated));
+                    }
+                  }}
+                  className="w-full bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-rose-600 text-center"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-stone-700 mb-1">
+                  سعر الوحدة الأصلي:
+                </label>
+                <div className="w-full bg-stone-200/70 border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-stone-700 text-center">
+                  {products.find((p) => p.id === selectedProductId)?.price.toLocaleString()} {storeSettings.currency}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Refund Amount */}
           <div className="bg-white p-3.5 rounded-2xl border-2 border-rose-300 space-y-1 text-center">

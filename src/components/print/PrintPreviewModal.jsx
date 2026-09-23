@@ -7,6 +7,8 @@ import { CombinedExpensesReceipt } from './CombinedExpensesReceipt';
 import { SalesReturnReceipt } from './SalesReturnReceipt';
 import { ZReportReceipt } from './ZReportReceipt';
 import { XReportReceipt } from './XReportReceipt';
+import { ProductMovementReceipt } from './ProductMovementReceipt';
+import { ShiftHandoverReceipt } from './ShiftHandoverReceipt';
 import { usePOS } from '../../context/POSContext';
 
 export function PrintPreviewModal() {
@@ -38,6 +40,10 @@ export function PrintPreviewModal() {
         return 'معاينة تقرير الإغلاق المالي (Z-Report)';
       case 'xreport':
         return 'معاينة مبيعات اليوم (X-Report)';
+      case 'shift_handover':
+        return 'معاينة وصل تسليم الوردية (ملخص الشفت)';
+      case 'product_movement':
+        return 'معاينة تقرير حركة ومبيعات الأصناف (حراري 80mm)';
       default:
         return 'معاينة الطباعة';
     }
@@ -64,6 +70,20 @@ export function PrintPreviewModal() {
         return <ZReportReceipt report={printJob.data} storeSettings={storeSettings} />;
       case 'xreport':
         return <XReportReceipt reportData={printJob.data} storeSettings={storeSettings} />;
+      case 'shift_handover':
+        return (
+          <ShiftHandoverReceipt
+            handoverData={printJob.data}
+            storeSettings={storeSettings}
+          />
+        );
+      case 'product_movement':
+        return (
+          <ProductMovementReceipt
+            reportData={printJob.data}
+            storeSettings={storeSettings}
+          />
+        );
       default:
         return null;
     }

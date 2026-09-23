@@ -1,5 +1,6 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
+import { ReceiptBrandingFooter } from './ReceiptBrandingFooter';
 
 export function CombinedExpensesReceipt({ expenses, sessionMeta, storeSettings }) {
   if (!expenses || expenses.length === 0) {
@@ -29,7 +30,7 @@ export function CombinedExpensesReceipt({ expenses, sessionMeta, storeSettings }
       <div className="text-center pb-2 border-b-2 border-black">
         <div className="text-base font-black tracking-wide text-black">{storeSettings.storeNameAr}</div>
         <div className="text-[11px] font-bold text-black">{storeSettings.storeNameEn}</div>
-        <div className="text-xs font-black bg-black text-white px-3 py-0.5 mt-1.5 inline-block">
+        <div className="text-xs font-black bg-white text-black border-2 border-black px-3 py-1 mt-1.5 inline-block">
           سند صرفيات اليوم المجمع
         </div>
         <div className="text-[10px] mt-1 font-mono font-bold text-black">{storeSettings.phone}</div>
@@ -57,7 +58,7 @@ export function CombinedExpensesReceipt({ expenses, sessionMeta, storeSettings }
           <thead>
             <tr className="border-b-2 border-black font-black">
               <th className="py-1 w-12">السند</th>
-              <th className="py-1">يصرف إلى / البيان</th>
+              <th className="py-1">بيان الصرف / التصنيف</th>
               <th className="py-1 text-left">المبلغ</th>
             </tr>
           </thead>
@@ -67,12 +68,9 @@ export function CombinedExpensesReceipt({ expenses, sessionMeta, storeSettings }
                 <td className="py-1.5 font-mono text-[9.5px] font-bold">{item.voucherNo || `#${idx + 1}`}</td>
                 <td className="py-1.5 pr-1">
                   <div className="font-black text-black leading-tight">
-                    {item.recipient || 'غير محدد'}
-                  </div>
-                  <div className="text-[9px] text-black font-medium leading-tight mt-0.5">
                     {item.description}
                   </div>
-                  <div className="text-[8.5px] text-black font-mono font-bold">
+                  <div className="text-[8.5px] text-black font-mono font-bold mt-0.5">
                     [{item.category}]
                   </div>
                 </td>
@@ -105,6 +103,9 @@ export function CombinedExpensesReceipt({ expenses, sessionMeta, storeSettings }
       <div className="pt-2 text-center text-[9px] font-bold font-mono text-black">
         نظام مسك وزعفران POS • وصل مجمع معتمد
       </div>
+
+      {/* Universal Footer Branding */}
+      <ReceiptBrandingFooter />
     </div>
   );
 }

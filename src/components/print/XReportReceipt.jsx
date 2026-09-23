@@ -1,5 +1,6 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
+import { ReceiptBrandingFooter } from './ReceiptBrandingFooter';
 
 export function XReportReceipt({ reportData, storeSettings }) {
   if (!reportData) return null;
@@ -24,7 +25,7 @@ export function XReportReceipt({ reportData, storeSettings }) {
       <div className="text-center pb-2 border-b-2 border-black">
         <div className="text-base font-black tracking-wide text-black">{storeSettings.storeNameAr}</div>
         <div className="text-[11px] font-bold tracking-wider text-black">{storeSettings.storeNameEn}</div>
-        <div className="text-xs font-black bg-black text-white px-3 py-1 mt-1.5 inline-block tracking-wider">
+        <div className="text-xs font-black bg-white text-black border-2 border-black px-3 py-1 mt-1.5 inline-block tracking-wider">
           معاينة مبيعات اليوم (X-REPORT)
         </div>
         <div className="text-[10px] mt-1 font-mono font-bold text-black">{storeSettings.phone}</div>
@@ -77,7 +78,9 @@ export function XReportReceipt({ reportData, storeSettings }) {
             <tbody className="divide-y divide-black">
               {itemizedItems.map((item, idx) => (
                 <tr key={idx} className="align-top">
-                  <td className="py-1 text-center font-mono font-black">{item.quantity}</td>
+                  <td className="py-1 text-center font-mono font-black whitespace-nowrap">
+                    {item.quantity % 1 !== 0 ? `${item.quantity} كغم` : item.quantity}
+                  </td>
                   <td className="py-1 pr-1 font-bold leading-tight">{item.name}</td>
                   <td className="py-1 text-left font-mono font-black">
                     {Number(item.total).toLocaleString()}
@@ -87,10 +90,13 @@ export function XReportReceipt({ reportData, storeSettings }) {
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-black font-black text-[10.5px]">
-                <td className="py-1 text-center font-mono">
-                  {itemizedItems.reduce((acc, it) => acc + it.quantity, 0)}
+                <td className="py-1 text-center font-mono whitespace-nowrap">
+                  {(() => {
+                    const totalQty = itemizedItems.reduce((acc, it) => acc + it.quantity, 0);
+                    return totalQty % 1 !== 0 ? totalQty.toFixed(2) : totalQty;
+                  })()}
                 </td>
-                <td className="py-1 pr-1">إجمالي عدد القطع المباعة</td>
+                <td className="py-1 pr-1">إجمالي الكميات المباعة</td>
                 <td className="py-1 text-left font-mono">
                   {itemizedItems.reduce((acc, it) => acc + it.total, 0).toLocaleString()} {storeSettings.currency}
                 </td>
@@ -173,6 +179,9 @@ export function XReportReceipt({ reportData, storeSettings }) {
           مسك وزعفران للمخبوزات والحلويات الملكية
         </div>
       </div>
+
+      {/* Universal Footer Branding */}
+      <ReceiptBrandingFooter />
     </div>
   );
 }
