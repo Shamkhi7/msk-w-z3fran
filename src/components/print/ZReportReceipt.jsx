@@ -165,6 +165,19 @@ export function ZReportReceipt({ report, storeSettings }) {
             </div>
           </div>
         </div>
+
+        {/* Isolated Delivery Fees (Not part of drawer cash) */}
+        {Number(report.totalDeliveryFees || 0) > 0 && (
+          <div className="p-1.5 border border-dashed border-black rounded text-[9.5px] bg-white space-y-0.5 mt-1">
+            <div className="flex justify-between font-black">
+              <span>أجور توصيل (للسائقين - معزولة عن الصندوق):</span>
+              <span className="font-mono">{Number(report.totalDeliveryFees).toLocaleString()} {storeSettings.currency}</span>
+            </div>
+            <div className="text-[8.5px] text-black">
+              * مبالغ التوصيل تخص السائقين وتم عزلها بالكامل ولا تدخل ضمن صافي نقد القاصة أعلاه.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Counts & Statistics */}

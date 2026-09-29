@@ -22,6 +22,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
+import { PeakHoursReport } from './PeakHoursReport';
 
 export function ProductReportsModule() {
   const {
@@ -36,6 +37,9 @@ export function ProductReportsModule() {
     verifyManagerPin,
     isManager,
   } = usePOS();
+
+  // Sub-Tab Switcher: 'products' | 'peak_hours'
+  const [activeReportSubTab, setActiveReportSubTab] = useState('products');
 
   // Filter States
   const [periodPreset, setPeriodPreset] = useState('today'); // 'today' | 'week' | 'month' | 'all' | 'custom'
@@ -393,42 +397,79 @@ export function ProductReportsModule() {
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-black text-brand-900 leading-tight">
-              تقرير مبيعات وحركة الأصناف (Product Movement Analytics)
+              {activeReportSubTab === 'products'
+                ? 'تقرير مبيعات وحركة الأصناف'
+                : 'تقرير ساعات الذروة ومقارنة الشفتات'}
             </h2>
             <p className="text-[11px] text-stone-500">
-              تحليل حركة بيع المنتجات والكميات والعائد المالي حسب الفترة المحددة مع خصم المردودات تلقائياً
+              {activeReportSubTab === 'products'
+                ? 'تحليل حركة بيع المنتجات والكميات والعائد المالي حسب الفترة المحددة مع خصم المردودات تلقائياً'
+                : 'تحليل أوقات الذروة الساعية، وتوزيع الإيراد وأداء الشفت الصباحي مقابل المسائي'}
             </p>
           </div>
         </div>
 
-        {/* Action Buttons Group */}
-        <div className="flex items-center gap-2">
-          {/* Action Button: Reset Product Movement (Manager Only) */}
+        {/* Center Sub-Tabs Switcher */}
+        <div className="flex items-center gap-1 bg-warm-100 p-1 rounded-xl border border-warm-300">
           <button
             type="button"
-            onClick={handleOpenResetModal}
-            title="تصفير عدادات كميات ومبيعات الأصناف لبدء دورة إحصائية جديدة (محمي برمز المدير)"
-            className="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 shadow-xs hover:shadow-md transition-all cursor-pointer active:scale-98 border border-rose-600/40"
+            onClick={() => setActiveReportSubTab('products')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeReportSubTab === 'products'
+                ? 'bg-brand-800 text-white shadow-xs'
+                : 'text-stone-700 hover:bg-white/60'
+            }`}
           >
-            <RotateCcw className="w-4 h-4 text-rose-200" />
-            <span>تصفير إحصائيات حركة الأصناف</span>
+            حركة ومبيعات الأصناف
           </button>
-
-          {/* Action Button: Print 72.1mm Thermal Report */}
           <button
             type="button"
-            onClick={handlePrintReport}
-            title="طباعة تقرير حركة ومبيعات الأصناف على رول الفواتير الحراري (72.1mm)"
-            className="bg-brand-800 hover:bg-brand-900 text-white font-black px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer active:scale-98 border border-gold-500/30"
+            onClick={() => setActiveReportSubTab('peak_hours')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeReportSubTab === 'peak_hours'
+                ? 'bg-brand-800 text-white shadow-xs'
+                : 'text-stone-700 hover:bg-white/60'
+            }`}
           >
-            <Printer className="w-4 h-4 text-gold-400" />
-            <span>طباعة تقرير حركة المنتجات (وصل حراري)</span>
+            <Clock className="w-3.5 h-3.5 text-gold-400" />
+            <span>ساعات الذروة والشفتات ⚡</span>
           </button>
         </div>
+
+        {/* Action Buttons Group (Shown for products sub-tab) */}
+        {activeReportSubTab === 'products' && (
+          <div className="flex items-center gap-2">
+            {/* Action Button: Reset Product Movement (Manager Only) */}
+            <button
+              type="button"
+              onClick={handleOpenResetModal}
+              title="تصفير عدادات كميات ومبيعات الأصناف لبدء دورة إحصائية جديدة (محمي برمز المدير)"
+              className="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 shadow-xs hover:shadow-md transition-all cursor-pointer active:scale-98 border border-rose-600/40"
+            >
+              <RotateCcw className="w-4 h-4 text-rose-200" />
+              <span>تصفير الإحصائيات</span>
+            </button>
+
+            {/* Action Button: Print 72.1mm Thermal Report */}
+            <button
+              type="button"
+              onClick={handlePrintReport}
+              title="طباعة تقرير حركة ومبيعات الأصناف على رول الفواتير الحراري (72.1mm)"
+              className="bg-brand-800 hover:bg-brand-900 text-white font-black px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer active:scale-98 border border-gold-500/30"
+            >
+              <Printer className="w-4 h-4 text-gold-400" />
+              <span>طباعة (وصل حراري)</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Active Statistical Cycle Badge & Alerts */}
-      <div className="px-3 sm:px-4 pt-3 space-y-2">
+      {activeReportSubTab === 'peak_hours' ? (
+        <PeakHoursReport />
+      ) : (
+        <>
+          {/* Active Statistical Cycle Badge & Alerts */}
+          <div className="px-3 sm:px-4 pt-3 space-y-2">
         {productMovementResetAt && (
           <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold">
             <div className="flex items-center gap-2">
@@ -852,6 +893,8 @@ export function ProductReportsModule() {
           )}
         </div>
       </div>
+      </>
+      )}
 
       {/* Manager-Protected Product Movement Reset Modal */}
       {isResetModalOpen && (

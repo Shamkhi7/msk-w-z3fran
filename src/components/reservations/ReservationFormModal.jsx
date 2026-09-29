@@ -18,22 +18,76 @@ import {
   CheckSquare,
   Square,
   FileText,
+  Printer,
+  UserCheck,
+  Users,
+  Star,
+  Send,
+  MessageSquare,
+  Camera,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { formatPickupDateTime, getArabicWeekday } from '../../utils/dateFormatter';
+import { sendReservationToStaffGroup } from '../../utils/whatsappHelper';
 import { VirtualNumpadModal } from '../common/VirtualNumpadModal';
+import { ManageReservationStaffModal } from './ManageReservationStaffModal';
+import { ManagerPinModal } from '../treasury/ManagerPinModal';
+import { WhatsAppReceiptImageModal } from './WhatsAppReceiptImageModal';
 
 export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
-  const { addReservation, updateReservation, storeSettings } = usePOS();
+  const {
+    addReservation,
+    updateReservation,
+    triggerPrint,
+    storeSettings,
+    activeCashier,
+    reservationStaffList,
+    isManager,
+    customersDirectory,
+  } = usePOS();
+
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+
+  const handleOpenStaffManagement = () => {
+    if (isManager) {
+      setIsStaffModalOpen(true);
+    } else {
+      setIsPinModalOpen(true);
+    }
+  };
 
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-  // Customer Details & Custom Manual Reservation #
+  // Customer Details & Custom Manual Reservation # & Worker Name
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
+  const [workerName, setWorkerName] = useState('');
   const [manualBookingNo, setManualBookingNo] = useState('');
   const [pickupDate, setPickupDate] = useState(tomorrow);
   const [pickupTime, setPickupTime] = useState('18:00');
+
+  // Customer Loyalty & Auto-complete
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [selectedCustomerNote, setSelectedCustomerNote] = useState('');
+  const [isVipCustomer, setIsVipCustomer] = useState(false);
+
+  const matchedCustomers = useMemo(() => {
+    const term = (customerName || phone).trim().toLowerCase();
+    if (!term || term.length < 2) return [];
+    const list = Array.isArray(customersDirectory) ? customersDirectory : [];
+    return list
+      .filter((c) => c.name?.toLowerCase().includes(term) || c.phone?.includes(term))
+      .slice(0, 5);
+  }, [customerName, phone, customersDirectory]);
+
+  const handleSelectCustomer = (cust) => {
+    setCustomerName(cust.name || '');
+    setPhone(cust.phone || '');
+    setSelectedCustomerNote(cust.notes || '');
+    setIsVipCustomer(Boolean(cust.isVip));
+    setShowCustomerDropdown(false);
+  };
 
   // Unified Multi-Item Selection Toggles
   const [includeMold, setIncludeMold] = useState(true);
@@ -65,6 +119,8 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
   const [depositPaid, setDepositPaid] = useState('15000');
   const [notes, setNotes] = useState('');
   const [ringUpDeposit, setRingUpDeposit] = useState(true);
+  const [autoSendWhatsApp, setAutoSendWhatsApp] = useState(false);
+  const [imageModalReservation, setImageModalReservation] = useState(null);
 
   // Virtual Numpad State
   const [numpadConfig, setNumpadConfig] = useState({
@@ -170,6 +226,7 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
 
         setHasPackaging(Boolean(initialData.hasPackaging));
         setSlicesFlavor(initialData.slicesFlavor || '');
+        setWorkerName(initialData.workerName || '');
         setTotalCost(String(initialData.totalCost || 0));
         setDepositPaid(String(initialData.depositPaid || 0));
         setNotes(initialData.notes || '');
@@ -177,6 +234,7 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
       } else {
         setCustomerName('');
         setPhone('');
+        setWorkerName('');
         setManualBookingNo('');
         setPickupDate(tomorrow);
         setPickupTime('18:00');
@@ -277,11 +335,16 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
     });
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const doSubmit = (printOption = 'customer', e = null, sendWhatsApp = false) => {
+    if (e && e.preventDefault) e.preventDefault();
 
     if (!customerName.trim() || !phone.trim()) {
       alert('يرجى إدخال اسم الزبون ورقم الهاتف');
+      return;
+    }
+
+    if (!workerName.trim()) {
+      alert('يرجى تحديد أو إدخال اسم الموظف / العامل المسؤول عن الحجز');
       return;
     }
 
@@ -327,6 +390,7 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
       manualBookingNo: manualBookingNo.trim(),
       customerName: customerName.trim(),
       phone: phone.trim(),
+      workerName: workerName.trim(),
       pickupDate,
       pickupTime,
       hasMold: includeMold,
@@ -361,13 +425,28 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
       notes: notes.trim(),
     };
 
+    let savedReservation = null;
+
     if (initialData) {
-      updateReservation(initialData.id, payload);
+      savedReservation = updateReservation(initialData.id, payload);
+      if (printOption === 'kitchen') {
+        triggerPrint('kitchen_ticket', savedReservation);
+      } else if (printOption === 'customer' || printOption === 'reservation') {
+        triggerPrint('reservation', savedReservation);
+      }
     } else {
-      addReservation(payload, ringUpDeposit);
+      savedReservation = addReservation(payload, ringUpDeposit, printOption);
     }
 
-    onClose();
+    if (sendWhatsApp || autoSendWhatsApp) {
+      setImageModalReservation(savedReservation);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleSubmit = (e) => {
+    doSubmit('customer', e, autoSendWhatsApp);
   };
 
   return (
@@ -400,59 +479,221 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
 
           {/* Scrollable Form */}
           <form onSubmit={handleSubmit} className="p-4 sm:p-5 overflow-y-auto space-y-4">
-            {/* Customer Contacts & Custom Manual Reservation Number */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-3 rounded-2xl border border-warm-200 shadow-2xs">
-              <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1">
-                  اسم الزبون / صاحب الحجز:
-                </label>
+            {/* Customer Contacts & Responsible Staff Section */}
+            <div className="bg-white p-3.5 rounded-2xl border border-warm-200 shadow-2xs space-y-3">
+              {/* Row 1: Customer Details & Manual Receipt (3 clean, balanced columns) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative">
                 <div className="relative">
-                  <User className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="مثال: أم مريم الجبوري"
-                    className="w-full bg-stone-50 border border-stone-300 rounded-xl pr-9 pl-3 py-2 text-sm font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
-                    required
-                    autoFocus={!initialData}
-                  />
+                  <label className="block text-xs font-bold text-stone-700 mb-1">
+                    اسم الزبون / صاحب الحجز:
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                    <input
+                      type="text"
+                      value={customerName}
+                      onFocus={() => setShowCustomerDropdown(true)}
+                      onChange={(e) => {
+                        setCustomerName(e.target.value);
+                        setShowCustomerDropdown(true);
+                      }}
+                      placeholder="مثال: أم مريم الجبوري"
+                      className="w-full bg-stone-50 border border-stone-300 rounded-xl pr-9 pl-3 py-2 text-sm font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+                      required
+                      autoFocus={!initialData}
+                    />
+                  </div>
                 </div>
+
+                <div className="relative">
+                  <label className="block text-xs font-bold text-stone-700 mb-1">
+                    رقم الهاتف:
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                    <input
+                      type="tel"
+                      value={phone}
+                      onFocus={() => setShowCustomerDropdown(true)}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        setShowCustomerDropdown(true);
+                      }}
+                      placeholder="0770 000 0000"
+                      className="w-full bg-stone-50 border border-stone-300 rounded-xl pr-9 pl-3 py-2 text-sm font-mono font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1 flex items-center justify-between">
+                    <span>رقم الوصل / الحجز اليدوي:</span>
+                    <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                      اختياري
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <FileText className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-amber-600" />
+                    <input
+                      type="text"
+                      value={manualBookingNo}
+                      onChange={(e) => setManualBookingNo(e.target.value)}
+                      placeholder="مثال: 104 أو B-22"
+                      className="w-full bg-amber-50/40 border border-amber-300/80 rounded-xl pr-9 pl-3 py-2 text-sm font-mono font-bold text-stone-900 placeholder:text-stone-400 placeholder:font-sans placeholder:text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-600"
+                    />
+                  </div>
+                </div>
+
+                {/* Auto-complete Dropdown */}
+                {showCustomerDropdown && matchedCustomers.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border-2 border-brand-800/40 rounded-xl shadow-xl overflow-hidden animate-fade-in">
+                    <div className="p-1.5 bg-brand-900 text-white text-[10px] font-bold flex justify-between items-center">
+                      <span>زبائن مسجلون في السجل:</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomerDropdown(false)}
+                        className="text-warm-200 hover:text-white"
+                      >
+                        إغلاق ✕
+                      </button>
+                    </div>
+                    <div className="divide-y divide-stone-100 max-h-48 overflow-y-auto">
+                      {matchedCustomers.map((cust) => (
+                        <div
+                          key={cust.id}
+                          onClick={() => handleSelectCustomer(cust)}
+                          className="p-2 px-3 hover:bg-amber-50 flex items-center justify-between cursor-pointer transition-colors"
+                        >
+                          <div>
+                            <div className="flex items-center gap-1.5 font-bold text-xs text-stone-900">
+                              {cust.isVip && <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />}
+                              <span>{cust.name}</span>
+                              {cust.phone && (
+                                <span className="font-mono text-[11px] text-stone-500 font-normal">
+                                  ({cust.phone})
+                                </span>
+                              )}
+                            </div>
+                            {cust.notes && (
+                              <div className="text-[10px] text-amber-800 italic mt-0.5">
+                                {cust.notes}
+                              </div>
+                            )}
+                          </div>
+                          {isManager && (
+                            <div className="text-right text-[10px] text-emerald-800 font-mono font-bold">
+                              {(cust.totalSpent || 0).toLocaleString()} {storeSettings.currency}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1">
-                  رقم الهاتف:
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="0770 000 0000"
-                    className="w-full bg-stone-50 border border-stone-300 rounded-xl pr-9 pl-3 py-2 text-sm font-mono font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
-                    required
-                  />
+              {/* Selected Customer Loyalty Pill */}
+              {(selectedCustomerNote || isVipCustomer) && (
+                <div className="p-2 px-3 bg-amber-50 border border-amber-300 rounded-xl text-xs flex items-center justify-between gap-2 animate-fade-in">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isVipCustomer && (
+                      <span className="bg-amber-400 text-stone-950 px-2 py-0.5 rounded-full text-[10px] font-black flex items-center gap-0.5 shadow-2xs">
+                        <Star className="w-3 h-3 fill-current" />
+                        <span>زبون مميز VIP</span>
+                      </span>
+                    )}
+                    {selectedCustomerNote && (
+                      <span className="text-amber-950 font-semibold text-[11px]">
+                        💡 تفضيل الزبون السابق: {selectedCustomerNote}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCustomerNote('');
+                      setIsVipCustomer(false);
+                    }}
+                    className="text-stone-400 hover:text-stone-600 text-[10px] p-0.5 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-              </div>
+              )}
 
-              <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1 flex items-center justify-between">
-                  <span>رقم الحجز اليدوي / الوصل:</span>
-                  <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
-                    اختياري
+              {/* Row 2: Staff Selection & Management (Clean, unified horizontal bar) */}
+              <div className="pt-2.5 border-t border-stone-100 flex flex-col md:flex-row md:items-center justify-between gap-2.5 bg-stone-50/80 p-2.5 rounded-xl border border-stone-200/80">
+                {/* Left: Input with icon */}
+                <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <UserCheck className="w-4 h-4 text-brand-800" />
+                    <span className="text-xs font-bold text-stone-800 whitespace-nowrap">
+                      المسؤول عن الحجز:
+                    </span>
+                  </div>
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      list="staff-suggestions"
+                      value={workerName}
+                      onChange={(e) => setWorkerName(e.target.value)}
+                      placeholder="اكتب أو اختر من الأسماء..."
+                      className={`w-full bg-white border rounded-xl pr-3 pl-7 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-800 shadow-2xs ${
+                        !workerName ? 'border-amber-300 ring-1 ring-amber-300/50' : 'border-stone-300'
+                      }`}
+                      required
+                    />
+                    {workerName && (
+                      <button
+                        type="button"
+                        onClick={() => setWorkerName('')}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5 rounded cursor-pointer"
+                        title="مسح"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <datalist id="staff-suggestions">
+                      {reservationStaffList.map((name, idx) => (
+                        <option key={idx} value={name} />
+                      ))}
+                    </datalist>
+                  </div>
+                </div>
+
+                {/* Right: Quick Staff Pills & Settings Button */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-bold text-stone-500 whitespace-nowrap hidden sm:inline">
+                    اختيار سريع:
                   </span>
-                </label>
-                <div className="relative">
-                  <FileText className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-amber-600" />
-                  <input
-                    type="text"
-                    value={manualBookingNo}
-                    onChange={(e) => setManualBookingNo(e.target.value)}
-                    placeholder="مثال: 104 أو B-22"
-                    className="w-full bg-amber-50/40 border border-amber-300/80 rounded-xl pr-9 pl-3 py-2 text-sm font-mono font-bold text-stone-900 placeholder:text-stone-400 placeholder:font-sans placeholder:text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-600"
-                  />
+                  {reservationStaffList.map((name, idx) => {
+                    const isSelected = workerName.trim().toLowerCase() === name.trim().toLowerCase();
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setWorkerName(isSelected ? '' : name)}
+                        className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-brand-900 text-white border-brand-950 shadow-xs ring-1 ring-brand-700 scale-102'
+                            : 'bg-white hover:bg-warm-100 text-stone-800 border-stone-300 shadow-2xs'
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={handleOpenStaffManagement}
+                    className="text-xs text-brand-900 hover:text-brand-950 font-bold bg-white hover:bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-300/80 transition-all flex items-center gap-1 cursor-pointer shadow-2xs shrink-0"
+                    title="إدارة وتعديل قائمة أسماء الموظفين"
+                  >
+                    <span>تعديل</span>
+                    <span className="text-xs">⚙️</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1020,26 +1261,86 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
               />
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-2.5 pt-2 border-t border-stone-200">
-              <button
-                type="submit"
-                className="flex-1 bg-brand-800 hover:bg-brand-900 text-white font-black py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
-              >
-                <Check className="w-4 h-4 text-gold-400" />
-                <span>
-                  {initialData
-                    ? 'حفظ وتحديث بيانات الحجز'
-                    : 'تثبيت الحجز وطباعة الوصل الحراري (72.1mm)'}
+            {/* Actions: Multi-Option Print & WhatsApp Group Dispatch */}
+            <div className="pt-2 border-t border-stone-200 space-y-2.5">
+              {/* WhatsApp Group Auto-Dispatch Toggle */}
+              <div className="flex items-center justify-between bg-emerald-50/90 border border-emerald-300/80 px-3 py-2 rounded-xl">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-emerald-950">
+                  <input
+                    type="checkbox"
+                    checked={autoSendWhatsApp}
+                    onChange={(e) => setAutoSendWhatsApp(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>تجهيز صورة الوصل تلقائياً لمشاركتها بكروب الموظفين فور الحفظ 📸</span>
+                  </div>
+                </label>
+                <span className="text-[10px] text-emerald-800 font-normal hidden sm:inline">
+                  (يولد صورة واضحة للوصل لفتحها وإرسالها بالواتساب)
                 </span>
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl transition-colors text-sm cursor-pointer"
-              >
-                إلغاء
-              </button>
+              </div>
+
+              <div className="text-[11px] font-bold text-stone-600 flex items-center justify-between">
+                <span>خيارات الحفظ والإرسال والطباعة الفورية (حراري 72.1mm):</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                {/* 1. Primary Highlight: Save + Send Receipt Image to Staff Group */}
+                <button
+                  type="button"
+                  onClick={() => doSubmit('customer', null, true)}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white font-black py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition-all cursor-pointer border border-emerald-500 active:scale-95"
+                  title="حفظ الحجز وطباعة وصل الزبون فقط وتجهيز صورة الوصل لإرسالها لكروب الموظفين فوراً"
+                >
+                  <Camera className="w-4 h-4 text-emerald-200 shrink-0" />
+                  <span>حفظ + صورة للكروب 📸</span>
+                </button>
+
+                {/* 2. Customer Receipt Only */}
+                <button
+                  type="button"
+                  onClick={() => doSubmit('customer')}
+                  className="bg-brand-800 hover:bg-brand-900 text-white font-black py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition-all cursor-pointer border border-gold-400"
+                  title="حفظ الحجز وطباعة وصل الزبون الحراري فقط"
+                >
+                  <Printer className="w-4 h-4 text-gold-400 shrink-0" />
+                  <span>حفظ + وصل الزبون 🧾</span>
+                </button>
+
+                {/* 3. Kitchen Ticket Only */}
+                <button
+                  type="button"
+                  onClick={() => doSubmit('kitchen')}
+                  className="bg-amber-700 hover:bg-amber-800 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                  title="حفظ وطباعة بون المعمل فقط (للشيف بدون أسعار)"
+                >
+                  <Printer className="w-4 h-4 text-amber-200 shrink-0" />
+                  <span>بون المعمل فقط 👨‍🍳</span>
+                </button>
+
+                {/* 4. Save Without Printing */}
+                <button
+                  type="button"
+                  onClick={() => doSubmit('none')}
+                  className="bg-stone-700 hover:bg-stone-800 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                  title="حفظ بيانات الحجز في المنظومة بدون طباعة أي وصل ورقي"
+                >
+                  <Check className="w-4 h-4 text-stone-300 shrink-0" />
+                  <span>حفظ فقط (بدون طباعة) 💾</span>
+                </button>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl transition-colors text-xs cursor-pointer"
+                >
+                  إلغاء النافذة
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -1056,6 +1357,38 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
         quickPresets={numpadConfig.quickPresets}
         onConfirm={numpadConfig.onConfirm}
       />
+
+      {/* Staff Management Modal for Manager */}
+      <ManageReservationStaffModal
+        isOpen={isStaffModalOpen}
+        onClose={() => setIsStaffModalOpen(false)}
+      />
+
+      {/* Manager PIN Authentication if Cashier tries to open staff manager */}
+      <ManagerPinModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        onSuccess={() => {
+          setIsPinModalOpen(false);
+          setIsStaffModalOpen(true);
+        }}
+        title="إذن المدير لإدارة موظفي الحجوزات"
+        promptMessage="أدخل رمز مرور المدير لفتح وتعديل قائمة موظفي الحجوزات"
+      />
+
+      {/* WhatsApp Receipt Image Dispatch Modal */}
+      {imageModalReservation && (
+        <WhatsAppReceiptImageModal
+          isOpen={!!imageModalReservation}
+          onClose={() => {
+            setImageModalReservation(null);
+            onClose();
+          }}
+          reservation={imageModalReservation}
+          storeSettings={storeSettings}
+          initialType="kitchen"
+        />
+      )}
     </>
   );
 }

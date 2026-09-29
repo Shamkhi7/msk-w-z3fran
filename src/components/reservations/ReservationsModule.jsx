@@ -14,11 +14,22 @@ import {
   Trash2,
   Lock,
   Edit3,
+  UserCheck,
+  Users,
+  Flame,
+  Zap,
+  MessageCircle,
+  Send,
+  Copy,
+  Camera,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { ReservationFormModal } from './ReservationFormModal';
+import { WhatsAppReceiptImageModal } from './WhatsAppReceiptImageModal';
+import { ManageReservationStaffModal } from './ManageReservationStaffModal';
 import { ManagerPinModal } from '../treasury/ManagerPinModal';
-import { formatPickupDateTime } from '../../utils/dateFormatter';
+import { formatPickupDateTime, getReservationDueStatus } from '../../utils/dateFormatter';
+import { sendReservationToStaffGroup, copyReservationToClipboard } from '../../utils/whatsappHelper';
 
 export function ReservationsModule() {
   const {
@@ -35,13 +46,50 @@ export function ReservationsModule() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingReservation, setEditingReservation] = useState(null);
-  const [activeFilter, setActiveFilter] = useState('all'); // all, today, preparing, ready, delivered
+  const [activeFilter, setActiveFilter] = useState('all'); // all, today, urgent, preparing, ready, delivered
   const [searchQuery, setSearchQuery] = useState('');
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState(null); // { type: 'cancel', id } or { type: 'delete', reservation }
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // { type: 'cancel', id } or { type: 'delete', reservation } or { type: 'manage_staff' }
   const [reservationToDelete, setReservationToDelete] = useState(null);
+  const [receiptImageModalTarget, setReceiptImageModalTarget] = useState(null);
+
+  const handleOpenWhatsApp = (phone, customerName, bookingNo, pickupDate, pickupTime, remainingBalance) => {
+    if (!phone) return;
+    let cleanPhone = String(phone).replace(/[^0-9]/g, '');
+    if (cleanPhone.startsWith('07')) {
+      cleanPhone = '964' + cleanPhone.slice(1);
+    } else if (cleanPhone.startsWith('7')) {
+      cleanPhone = '964' + cleanPhone;
+    }
+    const msg = `مرحباً بك زبوننا العزيز ${customerName} في مسك وزعفران 🌸\nنود إعلامكم بتفاصيل حجز الكيك الخاص بكم رقم (${bookingNo}):\n📅 موعد الاستلام: ${formatPickupDateTime(pickupDate, pickupTime)}\n💰 المبلغ المتبقي بذمتكم: ${Number(remainingBalance || 0).toLocaleString()} د.ع\nنشكر ثقتكم ونتمنى لكم أطيب الأوقات ✨`;
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
+
+  const handleSendToStaff = (res) => {
+    setReceiptImageModalTarget(res);
+  };
+
+  const handleCopyForStaff = async (res) => {
+    const ok = await copyReservationToClipboard(res, storeSettings);
+    if (ok && showToast) {
+      showToast('تم نسخ تفاصيل الحجز كاملة إلى الحافظة! يمكنك لصقها الآن في أي كروب 📋', 'success');
+    }
+  };
+
+  const handleOpenStaffManagement = () => {
+    if (isManager) {
+      setIsStaffModalOpen(true);
+    } else {
+      setPendingAction({ type: 'manage_staff' });
+      setIsPinModalOpen(true);
+    }
+  };
 
   const todayStr = new Date().toISOString().split('T')[0];
+  const urgentCount = reservations.filter((r) => getReservationDueStatus(r.pickupDate, r.pickupTime, r.status).isUrgent).length;
+  const todayCount = reservations.filter((r) => r.pickupDate === todayStr).length;
 
   const filteredReservations = reservations.filter((r) => {
     const q = searchQuery.trim().toLowerCase();
@@ -50,6 +98,7 @@ export function ReservationsModule() {
       r.customerName?.toLowerCase().includes(q) ||
       r.phone?.includes(q) ||
       r.receiptNumber?.toLowerCase().includes(q) ||
+      (r.workerName && r.workerName.toLowerCase().includes(q)) ||
       (r.manualBookingNo && r.manualBookingNo.toLowerCase().includes(q)) ||
       (r.writtenText && r.writtenText.toLowerCase().includes(q)) ||
       (r.cakeMolds && r.cakeMolds.some((m) =>
@@ -61,6 +110,7 @@ export function ReservationsModule() {
     if (!matchesSearch) return false;
     if (activeFilter === 'all') return true;
     if (activeFilter === 'today') return r.pickupDate === todayStr;
+    if (activeFilter === 'urgent') return getReservationDueStatus(r.pickupDate, r.pickupTime, r.status).isUrgent;
     if (activeFilter === 'preparing') return r.status === 'قيد التحضير';
     if (activeFilter === 'ready') return r.status === 'جاهز';
     if (activeFilter === 'delivered') return r.status === 'تم التسليم';
@@ -154,16 +204,27 @@ export function ReservationsModule() {
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            setEditingReservation(null);
-            setIsFormOpen(true);
-          }}
-          className="bg-brand-800 hover:bg-brand-900 text-white font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer active:scale-98"
-        >
-          <Plus className="w-4 h-4 text-gold-400" />
-          <span>+ إضافة حجز</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleOpenStaffManagement}
+            className="bg-warm-100 hover:bg-warm-200 text-stone-800 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 border border-warm-300 transition-colors cursor-pointer"
+          >
+            <Users className="w-4 h-4 text-brand-800" />
+            <span>إدارة الموظفين</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setEditingReservation(null);
+              setIsFormOpen(true);
+            }}
+            className="bg-brand-800 hover:bg-brand-900 text-white font-bold px-4 py-2 rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer active:scale-98"
+          >
+            <Plus className="w-4 h-4 text-gold-400" />
+            <span>+ إضافة حجز</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Tabs & Search */}
@@ -171,8 +232,14 @@ export function ReservationsModule() {
         {/* Status Filters */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           {[
-            { id: 'all', label: 'كافة الحجوزات' },
-            { id: 'today', label: 'استلام اليوم' },
+            { id: 'all', label: 'كافة الحجوزات', count: reservations.length },
+            { id: 'today', label: 'استلام اليوم', count: todayCount, badgeClass: 'bg-brand-900 text-white' },
+            {
+              id: 'urgent',
+              label: 'عاجل ومتأخر ⚡',
+              count: urgentCount > 0 ? urgentCount : null,
+              badgeClass: 'bg-rose-600 text-white animate-pulse',
+            },
             { id: 'preparing', label: 'قيد التحضير' },
             { id: 'ready', label: 'جاهز للتسليم' },
             { id: 'delivered', label: 'تم التسليم' },
@@ -180,13 +247,26 @@ export function ReservationsModule() {
             <button
               key={tab.id}
               onClick={() => setActiveFilter(tab.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
                 activeFilter === tab.id
                   ? 'bg-brand-800 text-white shadow-xs'
+                  : tab.id === 'urgent' && tab.count > 0
+                  ? 'bg-rose-50 text-rose-900 border-2 border-rose-400 hover:bg-rose-100 font-black'
                   : 'bg-warm-50 text-stone-600 hover:bg-warm-100 border border-warm-200'
               }`}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              {tab.count !== undefined && tab.count !== null && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                    activeFilter === tab.id
+                      ? 'bg-white text-brand-900'
+                      : tab.badgeClass || 'bg-stone-200 text-stone-700'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -204,6 +284,39 @@ export function ReservationsModule() {
         </div>
       </div>
 
+      {/* Smart Urgency Banner (Appears when there are due/overdue orders) */}
+      {urgentCount > 0 && (
+        <div className="mx-3 sm:mx-4 mt-3 p-3 sm:p-3.5 bg-gradient-to-r from-rose-50 via-amber-50 to-rose-50 border-2 border-rose-300 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-xs animate-fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-xs shrink-0 animate-pulse">
+              <Flame className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-black text-rose-950 text-xs sm:text-sm flex items-center gap-2">
+                <span>تنبيه تسليم طلبيات الكيك:</span>
+                <span className="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">
+                  {urgentCount} طلبات موعدها الآن أو متأخرة
+                </span>
+              </div>
+              <div className="text-[11px] text-stone-600 font-medium">
+                يرجى مطابقة الكيك في قسم التجهيز والتزيين للتأكد من تسليمه في الوقت المحدد دون تأخير الزبائن
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveFilter('urgent')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+              activeFilter === 'urgent'
+                ? 'bg-rose-700 text-white'
+                : 'bg-white hover:bg-rose-600 hover:text-white text-rose-900 border border-rose-300 active:scale-95'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-amber-500" />
+            <span>عرض الطلبات العاجلة بنقرة واحدة</span>
+          </button>
+        </div>
+      )}
+
       {/* Reservations List */}
       <div className="flex-1 p-3 sm:p-4 overflow-y-auto">
         {filteredReservations.length === 0 ? (
@@ -217,6 +330,7 @@ export function ReservationsModule() {
               const badge = getStatusBadge(res.status);
               const BadgeIcon = badge.icon;
               const isToday = res.pickupDate === todayStr;
+              const dueStatus = getReservationDueStatus(res.pickupDate, res.pickupTime, res.status);
 
               const resMolds = (res.cakeMolds && res.cakeMolds.length > 0)
                 ? res.cakeMolds
@@ -234,7 +348,13 @@ export function ReservationsModule() {
               return (
                 <div
                   key={res.id}
-                  className="bg-white rounded-2xl border border-warm-200 shadow-xs hover:shadow-md transition-all p-4 flex flex-col justify-between text-right space-y-3"
+                  className={`bg-white rounded-2xl border shadow-xs hover:shadow-md transition-all p-4 flex flex-col justify-between text-right space-y-3 ${
+                    dueStatus.isOverdue
+                      ? 'border-rose-400 ring-1 ring-rose-300'
+                      : dueStatus.isUrgent
+                      ? 'border-amber-400 ring-1 ring-amber-300'
+                      : 'border-warm-200'
+                  }`}
                 >
                   {/* Card Header: Receipt # & Status Badge */}
                   <div className="flex items-start justify-between gap-2">
@@ -267,18 +387,47 @@ export function ReservationsModule() {
                             📦 تعليب
                           </span>
                         )}
-                        {isToday && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white animate-pulse">
-                            استلام اليوم
-                          </span>
-                        )}
+                        {/* Due Urgency Badge */}
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] border flex items-center gap-1 ${dueStatus.badgeClass}`}>
+                          {dueStatus.isUrgent && <Zap className="w-2.5 h-2.5 shrink-0" />}
+                          <span>{dueStatus.label}</span>
+                        </span>
                       </div>
                       <h4 className="font-black text-stone-800 text-base mt-1">
                         {res.customerName}
                       </h4>
-                      <div className="flex items-center gap-1 text-xs text-stone-500 font-mono mt-0.5">
-                        <Phone className="w-3.5 h-3.5 text-stone-400" />
-                        <span>{res.phone}</span>
+                      <div className="flex items-center gap-3 text-xs text-stone-500 font-mono mt-0.5 flex-wrap">
+                        <div className="flex items-center gap-1">
+                          <Phone className="w-3.5 h-3.5 text-stone-400" />
+                          <span>{res.phone}</span>
+                          {res.phone && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenWhatsApp(
+                                  res.phone,
+                                  res.customerName,
+                                  res.manualBookingNo || res.receiptNumber,
+                                  res.pickupDate,
+                                  res.pickupTime,
+                                  res.remainingBalance
+                                );
+                              }}
+                              title="إرسال تفاصيل وموعد الحجز عبر واتساب للزبون"
+                              className="mr-1 p-0.5 px-1.5 rounded-md bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-300 transition-colors text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <MessageCircle className="w-3 h-3" />
+                              <span>واتساب الزبون</span>
+                            </button>
+                          )}
+                        </div>
+                        {res.workerName && (
+                          <div className="flex items-center gap-1 text-[11px] text-stone-700 font-semibold bg-stone-100 px-1.5 py-0.5 rounded border border-stone-200">
+                            <UserCheck className="w-3 h-3 text-brand-800" />
+                            <span>المسؤول: {res.workerName}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -291,9 +440,15 @@ export function ReservationsModule() {
                   </div>
 
                   {/* Pickup Time & Date */}
-                  <div className="bg-warm-100/80 p-2.5 rounded-xl border border-warm-200 text-xs text-stone-800 flex justify-between items-center">
+                  <div className={`p-2.5 rounded-xl border text-xs flex justify-between items-center ${
+                    dueStatus.isOverdue
+                      ? 'bg-rose-50/90 border-rose-300 text-rose-950 font-bold'
+                      : dueStatus.isUrgent
+                      ? 'bg-amber-50/90 border-amber-300 text-amber-950 font-bold'
+                      : 'bg-warm-100/80 border-warm-200 text-stone-800'
+                  }`}>
                     <span className="font-bold flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-brand-800" />
+                      <Clock className={`w-3.5 h-3.5 ${dueStatus.isOverdue ? 'text-rose-600' : dueStatus.isUrgent ? 'text-amber-600' : 'text-brand-800'}`} />
                       <span>تاريخ ووقت الاستلام:</span>
                     </span>
                     <span className="text-xs font-black text-brand-900 bg-white px-2 py-0.5 rounded-lg border border-warm-200 shadow-xs">
@@ -436,13 +591,52 @@ export function ReservationsModule() {
                       <span>تعديل</span>
                     </button>
 
-                    <button
-                      onClick={() => triggerPrint('reservation', res)}
-                      title="إعادة طباعة وصل الحجز الحراري"
-                      className="p-1.5 bg-stone-100 hover:bg-brand-50 text-stone-600 hover:text-brand-800 rounded-xl border border-stone-200 transition-colors cursor-pointer"
-                    >
-                      <Printer className="w-4 h-4" />
-                    </button>
+                    {/* Print Options Group: Customer, Kitchen, Both */}
+                    <div className="flex items-center gap-0.5 bg-stone-100 p-0.5 rounded-xl border border-stone-300">
+                      <button
+                        type="button"
+                        onClick={() => triggerPrint('reservation', res)}
+                        title="طباعة وصل الزبون الحراري (المالي)"
+                        className="px-2 py-1 rounded-lg hover:bg-white text-stone-700 hover:text-brand-900 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <Printer className="w-3 h-3 text-stone-600" />
+                        <span>وصل الزبون</span>
+                      </button>
+
+                      <span className="text-stone-300 text-xs">|</span>
+
+                      <button
+                        type="button"
+                        onClick={() => triggerPrint('kitchen_ticket', res)}
+                        title="طباعة بون المعمل والإنتاج للشيف (بدون أسعار)"
+                        className="px-2 py-1 rounded-lg hover:bg-amber-100 text-amber-900 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <Printer className="w-3 h-3 text-amber-700" />
+                        <span>المعمل</span>
+                      </button>
+                    </div>
+
+                    {/* WhatsApp Staff Group Receipt Image Button */}
+                    <div className="flex items-center gap-1 bg-emerald-50/90 p-0.5 rounded-xl border border-emerald-300">
+                      <button
+                        type="button"
+                        onClick={() => handleSendToStaff(res)}
+                        title="إرسال صورة وصل الحجز لكروب موظفي المعمل عبر واتساب"
+                        className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95"
+                      >
+                        <Camera className="w-3 h-3 text-emerald-200" />
+                        <span>صورة للكروب 📸</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopyForStaff(res)}
+                        title="نسخ نص الحجز بالكامل للحافظة لمشاركته يدوياً بأي برنامج"
+                        className="p-1 text-emerald-800 hover:text-emerald-950 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
 
                     {/* Delete / Undo Reservation Button (accessible to current shift or Manager PIN) */}
                     <button
@@ -571,12 +765,31 @@ export function ReservationsModule() {
               ...pendingAction.reservation,
               isCurrentSession: false,
             });
+          } else if (pendingAction?.type === 'manage_staff') {
+            setIsStaffModalOpen(true);
           }
           setPendingAction(null);
         }}
         title="صلاحيات المدير - إدارة الحجوزات"
         promptMessage="هذا الإجراء يتطلب صلاحيات المدير. يرجى إدخال رمز تأكيد المدير للمتابعة"
       />
+
+      {/* Staff Management Modal */}
+      <ManageReservationStaffModal
+        isOpen={isStaffModalOpen}
+        onClose={() => setIsStaffModalOpen(false)}
+      />
+
+      {/* WhatsApp Receipt Image Dispatch Modal */}
+      {receiptImageModalTarget && (
+        <WhatsAppReceiptImageModal
+          isOpen={!!receiptImageModalTarget}
+          onClose={() => setReceiptImageModalTarget(null)}
+          reservation={receiptImageModalTarget}
+          storeSettings={storeSettings}
+          initialType="kitchen"
+        />
+      )}
     </div>
   );
 }

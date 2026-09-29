@@ -15,6 +15,7 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
+import { getShiftByLocalTime } from '../../utils/dateFormatter';
 
 export function SplashScreen({ onStart }) {
   const {
@@ -37,8 +38,8 @@ export function SplashScreen({ onStart }) {
   const [isPinVerified, setIsPinVerified] = useState(false);
   const [pinError, setPinError] = useState('');
 
-  // Step 2: Active Shift Selection ('صباحي' | 'مسائي')
-  const [selectedShift, setSelectedShift] = useState(null);
+  // Step 2: Active Shift Selection ('صباحي' | 'مسائي') - Auto-detected based on local time
+  const [selectedShift, setSelectedShift] = useState(() => getShiftByLocalTime(new Date(), storeSettings));
 
   // Hidden password input ref for physical typing
   const pinInputRef = useRef(null);

@@ -20,8 +20,8 @@ export function ReceiptBrandingFooter() {
 
       {/* Mandatory Brand Tagline */}
       <div
-        className="text-[9.5px] font-bold text-black pt-1 leading-tight tracking-wide"
-        style={{ color: '#000000' }}
+        className="text-[9.5px] font-bold text-black pt-1 leading-tight"
+        style={{ color: '#000000', letterSpacing: '0px' }}
       >
         نظام POS بواسطة shamkhi25
       </div>

@@ -41,7 +41,7 @@ export function ReservationReceipt({ reservation, storeSettings }) {
     <div className="receipt-container text-black bg-white select-none font-bold" style={{ color: '#000' }}>
       {/* Header */}
       <div className="text-center pb-2 border-b-2 border-black">
-        <div className="text-base font-black tracking-wide text-black">{storeSettings.storeNameAr}</div>
+        <div className="text-base font-black text-black">{storeSettings.storeNameAr}</div>
         <div className="text-[11px] font-bold text-black">{storeSettings.storeNameEn}</div>
         <div className="text-xs font-black border-2 border-black px-3 py-1 mt-1 inline-block bg-white text-black">
           {headerTitle}
@@ -71,23 +71,29 @@ export function ReservationReceipt({ reservation, storeSettings }) {
           <span className="font-black">رقم الهاتف:</span>
           <span className="font-mono font-black">{reservation.phone}</span>
         </div>
+        {reservation.workerName && (
+          <div className="flex justify-between">
+            <span className="font-black">الموظف المسجل:</span>
+            <span className="font-bold">{reservation.workerName}</span>
+          </div>
+        )}
         {/* Prominent Pickup Schedule with Day of Week */}
         <div className="border-2 border-black p-1.5 text-center my-1 bg-white">
           <div className="text-[10px] font-black text-black">تاريخ ووقت الاستلام:</div>
-          <div className="font-black text-xs text-black tracking-wide mt-0.5" dir="rtl">
+          <div className="font-black text-xs text-black mt-0.5" dir="rtl">
             {formattedSchedule}
           </div>
         </div>
       </div>
 
-      {/* SECTION A: CAKE MOLDS SPECIFICATIONS (IF INCLUDED) */}
+      {/* SECTION 1: CAKE MOLDS SPECIFICATIONS (IF INCLUDED) */}
       {hasMold && (
         <div className="py-2 border-b-2 border-black space-y-2 text-[10.5px] text-black">
           {cakeMolds.map((mold, idx) => (
             <div key={mold.id || idx} className="space-y-1 pb-1.5 border-b border-dashed border-black last:border-b-0 last:pb-0">
               <div className="flex justify-between items-center bg-white text-black border-2 border-black px-2 py-1 text-xs font-black">
                 <span>
-                  {cakeMolds.length > 1 ? `مواصفات قالب (${idx + 1}):` : 'مواصفات قالب الكيك:'}
+                  {cakeMolds.length > 1 ? `القسم 1: مواصفات قالب (${idx + 1}):` : 'القسم 1: مواصفات قالب الكيك:'}
                 </span>
                 <span>قياس {mold.cakeSize}</span>
               </div>
@@ -130,11 +136,11 @@ export function ReservationReceipt({ reservation, storeSettings }) {
         </div>
       )}
 
-      {/* SECTION B: CAKE SLICES SPECIFICATIONS (IF INCLUDED) */}
+      {/* SECTION 2: CAKE SLICES & PACKAGING SPECIFICATIONS (IF INCLUDED) */}
       {hasSlices && (
         <div className="py-2 border-b-2 border-black space-y-1 text-[10.5px] text-black">
           <div className="flex justify-between items-center bg-white text-black border-2 border-black px-2 py-1 text-xs font-black">
-            <span>تفاصيل قطع الكيك:</span>
+            <span>القسم 2: تفاصيل القطع الإضافية والتعليب:</span>
             <span>{reservation.totalPieces} قطعة</span>
           </div>
 
@@ -187,8 +193,11 @@ export function ReservationReceipt({ reservation, storeSettings }) {
         </div>
       )}
 
-      {/* Financials & Balance */}
+      {/* SECTION 3: FINANCIALS & BALANCE */}
       <div className="py-2 border-b-2 border-black space-y-1 text-[11px] text-black">
+        <div className="font-black border-b border-dashed border-black pb-0.5 text-center text-xs">
+          القسم 3: الحسابات والمالية والمتبقي
+        </div>
         <div className="flex justify-between">
           <span className="font-black">المجموع الكلي للطلبية:</span>
           <span className="font-mono font-bold text-xs">{reservation.totalCost.toLocaleString()} {storeSettings.currency}</span>

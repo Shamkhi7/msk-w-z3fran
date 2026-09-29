@@ -11,7 +11,10 @@ import {
   INITIAL_SALES_HISTORY,
   DEFAULT_PRESET_EXPENSES,
   DEFAULT_EXPENSE_CATEGORIES,
+  DEFAULT_RESERVATION_STAFF,
+  DEFAULT_CUSTOMERS,
 } from '../data/defaultData';
+import { getShiftByLocalTime, getReservationDueStatus } from '../utils/dateFormatter';
 
 const POSContext = createContext(null);
 
@@ -108,6 +111,74 @@ export function POSProvider({ children }) {
   // Dynamic Expense Categories (تصنيفات الصرفيات)
   const [expenseCategories, setExpenseCategories] = useLocalStorage('mz_expense_categories', DEFAULT_EXPENSE_CATEGORIES);
 
+  // Preset Staff List for Reservations (قائمة موظفي وعمال الحجوزات)
+  const [reservationStaffList, setReservationStaffList] = useLocalStorage('mz_reservation_staff', DEFAULT_RESERVATION_STAFF);
+
+  // Permanent Customers Directory (سجل الزبائن الدائمين)
+  const [customersDirectory, setCustomersDirectory] = useLocalStorage('mz_customers_directory', DEFAULT_CUSTOMERS);
+
+  // Last Backup Timestamp (تاريخ آخر حفظ احتياطي)
+  const [lastBackupAt, setLastBackupAt] = useLocalStorage('mz_last_backup_at', null);
+
+  // Urgent Reservations Count (حجوزات عاجلة خلال ساعتين أو متأخرة اليوم)
+  const urgentReservationsCount = useMemo(() => {
+    return (reservations || []).filter((r) => {
+      const status = getReservationDueStatus(r.pickupDate, r.pickupTime, r.status);
+      return status.isUrgent;
+    }).length;
+  }, [reservations]);
+
+  // Customer Directory Helper Methods
+  const upsertCustomer = (customerData) => {
+    if (!customerData) return null;
+    const phone = String(customerData.phone || '').trim();
+    const name = String(customerData.name || '').trim();
+    if (!name && !phone) return null;
+
+    let savedCust = null;
+    setCustomersDirectory((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      const existingIdx = list.findIndex(
+        (c) => (phone && c.phone === phone) || (!phone && name && c.name?.toLowerCase() === name.toLowerCase())
+      );
+
+      if (existingIdx >= 0) {
+        const existing = list[existingIdx];
+        savedCust = {
+          ...existing,
+          name: name || existing.name,
+          phone: phone || existing.phone,
+          notes: customerData.notes !== undefined ? customerData.notes : existing.notes,
+          isVip: customerData.isVip !== undefined ? customerData.isVip : existing.isVip,
+          totalOrders: Number(existing.totalOrders || 0) + (customerData.addOrder ? 1 : 0),
+          totalSpent: Number(existing.totalSpent || 0) + (Number(customerData.addSpend) || 0),
+          lastVisit: customerData.addOrder ? new Date().toISOString() : (customerData.lastVisit || existing.lastVisit),
+        };
+        const updated = [...list];
+        updated[existingIdx] = savedCust;
+        return updated;
+      } else {
+        savedCust = {
+          id: 'cust-' + Date.now(),
+          name: name || 'زبون',
+          phone: phone || '',
+          notes: customerData.notes || '',
+          isVip: Boolean(customerData.isVip),
+          totalOrders: customerData.addOrder ? 1 : (Number(customerData.totalOrders) || 0),
+          totalSpent: customerData.addOrder ? (Number(customerData.addSpend) || 0) : (Number(customerData.totalSpent) || 0),
+          lastVisit: new Date().toISOString(),
+        };
+        return [savedCust, ...list];
+      }
+    });
+    return savedCust;
+  };
+
+  const deleteCustomer = (customerId) => {
+    setCustomersDirectory((prev) => (Array.isArray(prev) ? prev.filter((c) => c.id !== customerId) : []));
+    showToast('تم حذف بيانات الزبون من السجل', 'info');
+  };
+
   // Permanent Z-Reports Archive
   const [zReportsHistory, setZReportsHistory] = useLocalStorage('mz_zreports', []);
 
@@ -119,13 +190,33 @@ export function POSProvider({ children }) {
   const [activeCashier, setActiveCashier] = useLocalStorage('mz_active_cashier', 'كاشير 1');
   const cashierProfiles = ['كاشير 1', 'كاشير 2'];
 
-  // Dual Shift Tracking (صباحي / مسائي)
-  const [activeShiftType, setActiveShiftType] = useLocalStorage('mz_active_shift_type', 'صباحي'); // 'صباحي' | 'مسائي'
+  // Dual Shift Tracking (صباحي / مسائي) - Defaults to local time detection
+  const [activeShiftType, setActiveShiftType] = useLocalStorage('mz_active_shift_type', () =>
+    getShiftByLocalTime(new Date(), storeSettings)
+  );
+
+  // Single-invoice manual shift override state (e.g. sell one invoice for evening during morning, then auto-revert)
+  const [isSingleInvoiceShiftOverride, setIsSingleInvoiceShiftOverride] = useState(false);
 
   const switchShift = (targetShift) => {
     if (targetShift === activeShiftType) return;
     setActiveShiftType(targetShift);
     playSound('add');
+
+    const scheduledShift = getShiftByLocalTime(new Date(), storeSettings);
+    if (targetShift !== scheduledShift) {
+      setIsSingleInvoiceShiftOverride(true);
+      showToast(
+        `تم تفعيل الشفت الـ ${targetShift === 'صباحي' ? 'الصباحي ☀️' : 'المسائي 🌙'} مؤقتاً (لفاتورة واحدة فقط)، وسيعود تلقائياً فور إتمام البيع`,
+        'info'
+      );
+    } else {
+      setIsSingleInvoiceShiftOverride(false);
+      showToast(
+        `تمت العودة إلى شفت التوقيت الفعلي (${scheduledShift === 'صباحي' ? 'الصباحي ☀️' : 'المسائي 🌙'})`,
+        'success'
+      );
+    }
   };
 
   // Product Movement Statistical Cycle Reset (تصفير حركة الأصناف)
@@ -280,6 +371,49 @@ export function POSProvider({ children }) {
       setToast((cur) => (cur && cur.message === message ? null : cur));
     }, 4000);
   };
+
+  // Dedicated Shift Change Visual Alert State
+  const [shiftNotice, setShiftNotice] = useState(null);
+
+  // Runtime Auto Shift Switching Timer (switches immediately even during active usage)
+  useEffect(() => {
+    if (storeSettings.autoShiftSwitchEnabled === false) return;
+
+    const checkAutoShift = () => {
+      // Do not override if cashier temporarily switched shift for a single invoice
+      if (isSingleInvoiceShiftOverride) return;
+
+      const expectedShift = getShiftByLocalTime(new Date(), storeSettings);
+      if (expectedShift !== activeShiftType) {
+        // Immediate switch even during active usage!
+        setActiveShiftType(expectedShift);
+        playSound('success');
+
+        const isMorning = expectedShift === 'صباحي';
+        const noticeData = {
+          id: Date.now(),
+          shift: expectedShift,
+          shiftIcon: isMorning ? '☀️' : '🌙',
+          shiftName: isMorning ? 'الوردية الصباحية' : 'الوردية المسائية',
+          message: `تم تحويل وردية العمل تلقائياً إلى (${isMorning ? 'الوردية الصباحية ☀️' : 'الوردية المسائية 🌙'}) وفقاً للتوقيت المحلي`,
+          time: new Date().toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        };
+
+        setShiftNotice(noticeData);
+
+        // Auto-dismiss the prominent notice after 10 seconds
+        setTimeout(() => {
+          setShiftNotice((curr) => (curr?.id === noticeData.id ? null : curr));
+        }, 10000);
+      }
+    };
+
+    // Check periodically every 5 seconds for instant responsiveness
+    const interval = setInterval(checkAutoShift, 5000);
+    // Also run an immediate check on startup
+    checkAutoShift();
+    return () => clearInterval(interval);
+  }, [storeSettings, activeShiftType, isSingleInvoiceShiftOverride]);
 
   // 5. Thermal Printing State
   const [printJob, setPrintJob] = useState({
@@ -510,6 +644,21 @@ export function POSProvider({ children }) {
 
   const clearCart = () => {
     updateActiveCartItems([]);
+    setCartDeliveryFee(0);
+  };
+
+  const setCartDeliveryFee = (feeAmount) => {
+    const fee = Math.max(0, Number(feeAmount) || 0);
+    setCarts((prevCarts) => {
+      const list = Array.isArray(prevCarts) && prevCarts.length > 0 ? prevCarts : [{ id: 'cart-1', name: 'فاتورة 1', items: [] }];
+      const currentActiveId = activeCart.id;
+      return list.map((c) => {
+        if (c.id === currentActiveId) {
+          return { ...c, deliveryFee: fee };
+        }
+        return c;
+      });
+    });
   };
 
   const overrideCartItemPrice = (cartItemId, newPrice) => {
@@ -545,7 +694,7 @@ export function POSProvider({ children }) {
   };
 
   // ==========================================
-  // CART FINANCIAL TOTALS
+  // CART FINANCIAL TOTALS (WITH ISOLATED DELIVERY FEE)
   // ==========================================
   const cartSummary = useMemo(() => {
     let subtotal = 0;
@@ -570,7 +719,9 @@ export function POSProvider({ children }) {
       }
     });
 
-    const netTotal = Math.max(0, subtotal - totalDiscount);
+    const itemsNet = Math.max(0, subtotal - totalDiscount);
+    const deliveryFee = Math.max(0, Number(activeCart?.deliveryFee) || 0);
+    const netTotal = itemsNet + deliveryFee;
     const totalQty = (cart || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 
     return {
@@ -578,10 +729,12 @@ export function POSProvider({ children }) {
       linesCount: (cart || []).length,
       subtotal,
       totalDiscount,
+      itemsNet,
+      deliveryFee,
       netTotal,
       depositItemsTotal,
     };
-  }, [cart]);
+  }, [cart, activeCart?.deliveryFee]);
 
   // ==========================================
   // COMPLETE SALE / CHECKOUT
@@ -590,12 +743,18 @@ export function POSProvider({ children }) {
     if (!cart || cart.length === 0) return null;
 
     const receiptNo = 'INV-' + new Date().getFullYear() + '-' + (salesHistory.length + 1001);
-    
+    const resolvedDeliveryFee = paymentData.deliveryFee !== undefined
+      ? Math.max(0, Number(paymentData.deliveryFee) || 0)
+      : Math.max(0, Number(activeCart?.deliveryFee) || 0);
+
     const depositAmountInCart = (cart || [])
       .filter((item) => item.product?.isDeposit || item.product?.id === 'service-deposit')
       .reduce((sum, item) => sum + Math.max(0, (Number(item.unitPrice || item.price || 0) * (Number(item.quantity) || 1)) - (Number(item.discount) || 0)), 0);
 
-    const directSalesAmount = Math.max(0, cartSummary.netTotal - depositAmountInCart);
+    const itemsNet = Math.max(0, cartSummary.subtotal - cartSummary.totalDiscount);
+    // Direct shop sales amount EXCLUDES delivery fee!
+    const directSalesAmount = Math.max(0, itemsNet - depositAmountInCart);
+    const finalNetTotal = itemsNet + resolvedDeliveryFee;
 
     const newSale = {
       id: 'SALE-' + Date.now(),
@@ -604,13 +763,16 @@ export function POSProvider({ children }) {
       items: [...cart],
       subtotal: cartSummary.subtotal,
       totalDiscount: cartSummary.totalDiscount,
-      netTotal: cartSummary.netTotal,
+      itemsNet: itemsNet,
+      deliveryFee: resolvedDeliveryFee,
+      netTotal: finalNetTotal,
       depositAmount: depositAmountInCart,
       directSalesAmount: directSalesAmount,
-      amountReceived: Number(paymentData.amountReceived) || cartSummary.netTotal,
+      amountReceived: Number(paymentData.amountReceived) || finalNetTotal,
       changeDue: Number(paymentData.changeDue) || 0,
       paymentMethod: paymentData.paymentMethod || 'نقداً',
       customerName: paymentData.customerName || 'زبون عام',
+      customerPhone: paymentData.customerPhone || '',
       cashierName: activeCashier || storeSettings.cashierName,
       shiftType: activeShiftType || 'صباحي',
       date: new Date().toISOString(),
@@ -619,11 +781,23 @@ export function POSProvider({ children }) {
 
     setSalesHistory((prev) => [newSale, ...prev]);
 
+    // Auto-update or register customer in Customers Directory
+    if ((paymentData.customerName && paymentData.customerName.trim() !== 'زبون عام') || paymentData.customerPhone) {
+      upsertCustomer({
+        name: paymentData.customerName,
+        phone: paymentData.customerPhone,
+        notes: paymentData.customerNotes,
+        isVip: paymentData.isVip,
+        addOrder: true,
+        addSpend: finalNetTotal,
+      });
+    }
+
     // Close or reset the paid cart and shift active view
     const completedCartId = activeCart.id;
     setCarts((prevCarts) => {
       if (!Array.isArray(prevCarts) || prevCarts.length <= 1) {
-        return [{ id: prevCarts?.[0]?.id || 'cart-1', name: 'فاتورة 1', items: [] }];
+        return [{ id: prevCarts?.[0]?.id || 'cart-1', name: 'فاتورة 1', items: [], deliveryFee: 0 }];
       }
       return prevCarts.filter((c) => c.id !== completedCartId);
     });
@@ -642,6 +816,19 @@ export function POSProvider({ children }) {
     }
 
     playSound('success');
+
+    // Automatic Single-Invoice Shift Reversion:
+    // If the sale was made under an overridden shift, revert back immediately to the scheduled local time shift!
+    const scheduledShift = getShiftByLocalTime(new Date(), storeSettings);
+    if (activeShiftType !== scheduledShift || isSingleInvoiceShiftOverride) {
+      const soldShift = activeShiftType;
+      setActiveShiftType(scheduledShift);
+      setIsSingleInvoiceShiftOverride(false);
+      showToast(
+        `تم تسجيل الفاتورة على الشفت الـ ${soldShift === 'صباحي' ? 'الصباحي ☀️' : 'المسائي 🌙'}، وتمت إعادة الوردية تلقائياً إلى الـ ${scheduledShift === 'صباحي' ? 'الصباحي ☀️' : 'المسائي 🌙'}`,
+        'info'
+      );
+    }
 
     // Only trigger thermal receipt printing if not bypassed
     const doPrint = paymentData.printReceipt !== undefined ? Boolean(paymentData.printReceipt) : Boolean(shouldPrint);
@@ -683,7 +870,7 @@ export function POSProvider({ children }) {
   // ==========================================
   // RESERVATIONS MODULE
   // ==========================================
-  const addReservation = (reservationData, ringUpDepositToDrawer = true) => {
+  const addReservation = (reservationData, ringUpDepositToDrawer = true, printOption = 'reservation') => {
     const receiptNumber = 'RES-' + new Date().getFullYear() + '-' + (reservations.length + 1001);
     const deposit = Number(reservationData.depositPaid) || 0;
     const total = Number(reservationData.totalCost) || 0;
@@ -700,6 +887,7 @@ export function POSProvider({ children }) {
       manualBookingNo: (reservationData.manualBookingNo || '').trim(),
       customerName: reservationData.customerName,
       phone: reservationData.phone,
+      workerName: (reservationData.workerName || '').trim(),
       pickupDate: reservationData.pickupDate,
       pickupTime: reservationData.pickupTime || '18:00',
       sessionId: currentSession.sessionId,
@@ -796,8 +984,22 @@ export function POSProvider({ children }) {
       setSalesHistory((prev) => [depositSale, ...prev]);
     }
 
+    // Auto-save customer in Customer Directory
+    if (reservationData.customerName || reservationData.phone) {
+      upsertCustomer({
+        name: reservationData.customerName,
+        phone: reservationData.phone,
+        addOrder: true,
+        addSpend: deposit,
+      });
+    }
+
     playSound('success');
-    triggerPrint('reservation', newReservation);
+    if (printOption === 'kitchen') {
+      triggerPrint('kitchen_ticket', newReservation);
+    } else if (printOption === 'reservation' || printOption === 'customer') {
+      triggerPrint('reservation', newReservation);
+    }
     return newReservation;
   };
 
@@ -876,6 +1078,15 @@ export function POSProvider({ children }) {
           : r
       )
     );
+
+    if (reservation.customerName || reservation.phone) {
+      upsertCustomer({
+        name: reservation.customerName,
+        phone: reservation.phone,
+        addSpend: reservation.remainingBalance || 0,
+      });
+    }
+
     playSound('success');
   };
 
@@ -899,6 +1110,7 @@ export function POSProvider({ children }) {
       manualBookingNo: (updatedData.manualBookingNo !== undefined ? updatedData.manualBookingNo : existing.manualBookingNo || '').trim(),
       customerName: updatedData.customerName || existing.customerName,
       phone: updatedData.phone || existing.phone,
+      workerName: (updatedData.workerName !== undefined ? updatedData.workerName : (existing.workerName || '')).trim(),
       pickupDate: updatedData.pickupDate || existing.pickupDate,
       pickupTime: updatedData.pickupTime || existing.pickupTime || '18:00',
       hasMold,
@@ -1231,11 +1443,85 @@ export function POSProvider({ children }) {
   };
 
   // ==========================================
+  // RESERVATION STAFF / WORKERS MANAGEMENT
+  // ==========================================
+  const addReservationStaff = (staffName) => {
+    const trimmed = (staffName || '').trim();
+    if (!trimmed) {
+      showToast('يرجى كتابة اسم الموظف', 'warning');
+      return false;
+    }
+    const exists = (reservationStaffList || []).some(
+      (s) => s.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) {
+      showToast(`الموظف "${trimmed}" موجود مسبقاً في القائمة`, 'warning');
+      return false;
+    }
+    setReservationStaffList((prev) => [...(Array.isArray(prev) ? prev : []), trimmed]);
+    playSound('add');
+    showToast(`تمت إضافة الموظف "${trimmed}" إلى القائمة`, 'success');
+    return true;
+  };
+
+  const updateReservationStaff = (oldName, newName) => {
+    const trimmedNew = (newName || '').trim();
+    if (!trimmedNew) {
+      showToast('يرجى كتابة الاسم الجديد للموظف', 'warning');
+      return false;
+    }
+    if (oldName === trimmedNew) return true;
+
+    const exists = (reservationStaffList || []).some(
+      (s) => s.toLowerCase() === trimmedNew.toLowerCase() && s.toLowerCase() !== oldName.toLowerCase()
+    );
+    if (exists) {
+      showToast(`الموظف "${trimmedNew}" موجود مسبقاً في القائمة`, 'warning');
+      return false;
+    }
+
+    setReservationStaffList((prev) =>
+      (Array.isArray(prev) ? prev : []).map((s) => (s === oldName ? trimmedNew : s))
+    );
+
+    // Update workerName in existing reservations
+    setReservations((prev) =>
+      (Array.isArray(prev) ? prev : []).map((r) =>
+        r.workerName === oldName ? { ...r, workerName: trimmedNew } : r
+      )
+    );
+
+    playSound('add');
+    showToast(`تم تحديث اسم الموظف إلى "${trimmedNew}"`, 'success');
+    return true;
+  };
+
+  const deleteReservationStaff = (name) => {
+    if (!name) return;
+    setReservationStaffList((prev) =>
+      (Array.isArray(prev) ? prev : []).filter((s) => s !== name)
+    );
+    playSound('remove');
+    showToast(`تم حذف الموظف "${name}" من القائمة`, 'info');
+  };
+
+  const resetReservationStaff = () => {
+    setReservationStaffList(DEFAULT_RESERVATION_STAFF);
+    playSound('notification');
+    showToast('تمت استعادة قائمة الموظفين الافتراضية بنجاح', 'success');
+  };
+
+  // ==========================================
   // DYNAMIC DAILY TREASURY METRICS WITH DUAL SHIFT
   // ==========================================
   const computeFinancials = (salesList, returnsList, expensesList) => {
+    // Direct shop sales of products strictly EXCLUDES delivery fees
     const directSales = (salesList || []).reduce(
-      (sum, s) => sum + (s.directSalesAmount !== undefined ? s.directSalesAmount : s.netTotal),
+      (sum, s) => sum + (s.directSalesAmount !== undefined ? s.directSalesAmount : Math.max(0, (s.netTotal || 0) - (s.deliveryFee || 0))),
+      0
+    );
+    const totalDeliveryFees = (salesList || []).reduce(
+      (sum, s) => sum + (Number(s.deliveryFee) || 0),
       0
     );
     const salesReturnsTotal = (returnsList || []).reduce(
@@ -1251,6 +1537,8 @@ export function POSProvider({ children }) {
       (sum, e) => sum + Number(e.amount),
       0
     );
+    // Net cash in drawer is strictly: (Products Direct Sales - Returns + Deposits) - Expenses
+    // Delivery fees are completely segregated from shop cash!
     const netCash = (directSales - salesReturnsTotal + collectedDeposits) - dailyExpenses;
 
     const cashierName =
@@ -1262,6 +1550,7 @@ export function POSProvider({ children }) {
 
     return {
       directSales,
+      totalDeliveryFees,
       salesReturnsTotal,
       netDirectSales,
       collectedDeposits,
@@ -1349,6 +1638,7 @@ export function POSProvider({ children }) {
       openedAt: currentSession.openedAt,
       currentTime: new Date().toISOString(),
       directSales: dailyTreasury.directSales,
+      totalDeliveryFees: dailyTreasury.totalDeliveryFees,
       salesReturns: dailyTreasury.salesReturnsTotal,
       collectedDeposits: dailyTreasury.collectedDeposits,
       dailyExpenses: dailyTreasury.dailyExpenses,
@@ -1374,6 +1664,7 @@ export function POSProvider({ children }) {
       openedAt: currentSession.openedAt,
       handoverTime: new Date().toISOString(),
       directSales: metrics.directSales,
+      totalDeliveryFees: metrics.totalDeliveryFees,
       salesReturns: metrics.salesReturnsTotal,
       netDirectSales: metrics.netDirectSales,
       collectedDeposits: metrics.collectedDeposits,
@@ -1398,6 +1689,7 @@ export function POSProvider({ children }) {
       closedAt: shift.closedAt,
       closedBy: shift.closedBy,
       directSales: shift.directSales,
+      totalDeliveryFees: shift.totalDeliveryFees || 0,
       salesReturns: shift.salesReturns,
       collectedDeposits: shift.collectedDeposits,
       dailyExpenses: shift.dailyExpenses,
@@ -1426,6 +1718,7 @@ export function POSProvider({ children }) {
       closedAt: closingTime,
       closedBy: cashier,
       directSales: dailyTreasury.directSales,
+      totalDeliveryFees: dailyTreasury.totalDeliveryFees,
       salesReturns: dailyTreasury.salesReturnsTotal,
       collectedDeposits: dailyTreasury.collectedDeposits,
       dailyExpenses: dailyTreasury.dailyExpenses,
@@ -1446,6 +1739,7 @@ export function POSProvider({ children }) {
       closedAt: closingTime,
       closedBy: cashier,
       directSales: dailyTreasury.directSales,
+      totalDeliveryFees: dailyTreasury.totalDeliveryFees,
       salesReturns: dailyTreasury.salesReturnsTotal,
       netDirectSales: dailyTreasury.netDirectSales,
       collectedDeposits: dailyTreasury.collectedDeposits,
@@ -1565,9 +1859,12 @@ export function POSProvider({ children }) {
   // BACKUP & RESTORE
   // ==========================================
   const exportSystemData = async () => {
+    const timestamp = new Date().toISOString();
+    setLastBackupAt(timestamp);
+
     const backup = {
-      version: '1.2',
-      exportedAt: new Date().toISOString(),
+      version: '1.3',
+      exportedAt: timestamp,
       storeSettings,
       categories: cleanCategories,
       products,
@@ -1575,6 +1872,8 @@ export function POSProvider({ children }) {
       salesReturns,
       reservations,
       expenses,
+      customersDirectory: customersDirectory || [],
+      lastBackupAt: timestamp,
       zReportsHistory,
       shiftHistory,
       userRole,
@@ -1623,6 +1922,8 @@ export function POSProvider({ children }) {
       if (jsonData.salesReturns) setSalesReturns(jsonData.salesReturns);
       if (jsonData.reservations) setReservations(jsonData.reservations);
       if (jsonData.expenses) setExpenses(jsonData.expenses);
+      if (jsonData.customersDirectory) setCustomersDirectory(jsonData.customersDirectory);
+      if (jsonData.lastBackupAt) setLastBackupAt(jsonData.lastBackupAt);
       if (jsonData.zReportsHistory) setZReportsHistory(jsonData.zReportsHistory);
       if (jsonData.shiftHistory) setShiftHistory(jsonData.shiftHistory);
       if (jsonData.userRole) setUserRole(jsonData.userRole);
@@ -1642,6 +1943,8 @@ export function POSProvider({ children }) {
           mz_sales_returns: jsonData.salesReturns,
           mz_reservations: jsonData.reservations,
           mz_expenses: jsonData.expenses,
+          mz_customers_directory: jsonData.customersDirectory,
+          mz_last_backup_at: jsonData.lastBackupAt,
           mz_zreports: jsonData.zReportsHistory,
           mz_shift_history: jsonData.shiftHistory,
           mz_user_role: jsonData.userRole,
@@ -1670,6 +1973,7 @@ export function POSProvider({ children }) {
     setExpenses(INITIAL_EXPENSES);
     setPresetExpenses(DEFAULT_PRESET_EXPENSES);
     setExpenseCategories(DEFAULT_EXPENSE_CATEGORIES);
+    setReservationStaffList(DEFAULT_RESERVATION_STAFF);
     setSalesHistory([]);
     setSalesReturns([]);
     setShiftHistory([]);
@@ -1741,6 +2045,7 @@ export function POSProvider({ children }) {
     updateItemQuantity,
     removeFromCart,
     clearCart,
+    setCartDeliveryFee,
     overrideCartItemPrice,
     applyCartItemDiscount,
     cartSummary,
@@ -1760,6 +2065,11 @@ export function POSProvider({ children }) {
     updateReservationStatus,
     deliverReservationAndCollectBalance,
     deleteReservation,
+    reservationStaffList,
+    addReservationStaff,
+    updateReservationStaff,
+    deleteReservationStaff,
+    resetReservationStaff,
 
     // Expenses
     expenses,
@@ -1822,10 +2132,25 @@ export function POSProvider({ children }) {
     sessionRestoredNotice,
     setSessionRestoredNotice,
 
-    // Toast Notifications
+    // Toast Notifications & Shift Change Notice
     toast,
     setToast,
     showToast,
+    shiftNotice,
+    setShiftNotice,
+    isSingleInvoiceShiftOverride,
+    setIsSingleInvoiceShiftOverride,
+
+    // Customers Directory (سجل الزبائن الدائمين)
+    customersDirectory,
+    setCustomersDirectory,
+    upsertCustomer,
+    deleteCustomer,
+
+    // Backup & Urgency Monitoring
+    lastBackupAt,
+    setLastBackupAt,
+    urgentReservationsCount,
   };
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;

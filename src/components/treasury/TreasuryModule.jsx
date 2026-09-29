@@ -18,6 +18,7 @@ import {
   Sun,
   Moon,
   Trash2,
+  Truck,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { ManagerPinModal } from './ManagerPinModal';
@@ -76,6 +77,7 @@ export function TreasuryModule() {
 
   const {
     directSales,
+    totalDeliveryFees,
     salesReturnsTotal,
     netDirectSales,
     collectedDeposits,
@@ -361,6 +363,22 @@ export function TreasuryModule() {
             <div className="text-[10px] text-warm-200 mt-0.5 font-mono">
               = (المبيعات - المردود + العربون) - الصرفيات
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Segregated Delivery Fees Banner (عزل أجور التوصيل) */}
+      <div className="px-3 sm:px-4 pb-3">
+        <div className="bg-amber-50/90 border border-amber-300 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-amber-950 font-bold">
+            <Truck className="w-4 h-4 text-amber-700 shrink-0" />
+            <span>أجور توصيل الطلبيات (للسائقين - معزولة عن الصندوق):</span>
+            <span className="font-mono text-base font-black text-amber-900">
+              {Number(totalDeliveryFees || 0).toLocaleString()} {storeSettings.currency}
+            </span>
+          </div>
+          <div className="text-[11px] text-amber-800">
+            * مبالغ التوصيل تُسلّم للسائقين مباشرة ولا تدخل في إيرادات المحل ولا تؤثر على صافي نقدية الصندوق.
           </div>
         </div>
       </div>

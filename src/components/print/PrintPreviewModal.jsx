@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { Printer, X } from 'lucide-react';
 import { SalesReceipt } from './SalesReceipt';
 import { ReservationReceipt } from './ReservationReceipt';
+import { KitchenTicketReceipt } from './KitchenTicketReceipt';
 import { ExpenseVoucherReceipt } from './ExpenseVoucherReceipt';
 import { CombinedExpensesReceipt } from './CombinedExpensesReceipt';
 import { SalesReturnReceipt } from './SalesReturnReceipt';
@@ -29,7 +30,11 @@ export function PrintPreviewModal() {
       case 'sale':
         return 'معاينة وصل البيع (حراري 80mm)';
       case 'reservation':
-        return 'معاينة وصل حجز قالب الكيك';
+        return 'معاينة وصل الزبون للحجز';
+      case 'kitchen_ticket':
+        return 'معاينة بون المعمل والإنتاج (للشيف)';
+      case 'dual_reservation':
+        return 'معاينة الوصل المزدوج (وصل الزبون + بون المعمل)';
       case 'expense':
         return 'معاينة سند الصرف النقدي';
       case 'combined_expenses':
@@ -55,6 +60,18 @@ export function PrintPreviewModal() {
         return <SalesReceipt sale={printJob.data} storeSettings={storeSettings} />;
       case 'reservation':
         return <ReservationReceipt reservation={printJob.data} storeSettings={storeSettings} />;
+      case 'kitchen_ticket':
+        return <KitchenTicketReceipt reservation={printJob.data} storeSettings={storeSettings} />;
+      case 'dual_reservation':
+        return (
+          <>
+            <ReservationReceipt reservation={printJob.data} storeSettings={storeSettings} />
+            <div className="my-5 border-b-2 border-dashed border-black text-center text-[10px] font-black py-1 select-none">
+              ✂️ ----------------- قص الورق الحراري (بون المعمل) ----------------- ✂️
+            </div>
+            <KitchenTicketReceipt reservation={printJob.data} storeSettings={storeSettings} />
+          </>
+        );
       case 'expense':
         return <ExpenseVoucherReceipt expense={printJob.data} storeSettings={storeSettings} />;
       case 'combined_expenses':

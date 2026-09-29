@@ -114,8 +114,23 @@ export function SalesReceipt({ sale, storeSettings }) {
           </>
         )}
 
+        {Number(sale.deliveryFee) > 0 && (
+          <>
+            <div className="flex justify-between">
+              <span>مجموع المواد:</span>
+              <span className="font-mono font-bold">
+                {((sale.itemsNet !== undefined ? sale.itemsNet : (sale.subtotal - (sale.totalDiscount || 0)))).toLocaleString()} {storeSettings.currency}
+              </span>
+            </div>
+            <div className="flex justify-between font-black">
+              <span>أجور التوصيل (للسائق):</span>
+              <span className="font-mono font-black">+{Number(sale.deliveryFee).toLocaleString()} {storeSettings.currency}</span>
+            </div>
+          </>
+        )}
+
         <div className="flex justify-between text-xs font-black pt-1 border-t-2 border-black">
-          <span>المبلغ المطلوب (الصافي):</span>
+          <span>المجموع الكلي المطلوب من الزبون:</span>
           <span className="font-mono text-sm font-black">{sale.netTotal.toLocaleString()} {storeSettings.currency}</span>
         </div>
 

@@ -1,24 +1,45 @@
 import React, { useState } from 'react';
-import { X, Check, AlertTriangle, Printer, RotateCcw, ShieldCheck } from 'lucide-react';
+import {
+  X,
+  Check,
+  AlertTriangle,
+  Printer,
+  RotateCcw,
+  ShieldCheck,
+  HardDrive,
+  Download,
+  CheckCircle2,
+} from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
 
 export function ZReportConfirmationModal({ isOpen, onClose }) {
-  const { dailyTreasury, closeDayAndResetDrawer, storeSettings, printXReport } = usePOS();
+  const {
+    dailyTreasury,
+    closeDayAndResetDrawer,
+    storeSettings,
+    printXReport,
+    exportSystemData,
+    lastBackupAt,
+  } = usePOS();
+
+  const {
+    directSales = 0,
+    salesReturnsTotal = 0,
+    collectedDeposits = 0,
+    dailyExpenses = 0,
+    netCash = 0,
+  } = dailyTreasury || {};
+
   const [closingNotes, setClosingNotes] = useState('');
+  const [backupDownloaded, setBackupDownloaded] = useState(false);
 
   if (!isOpen) return null;
 
-  const {
-    directSales,
-    salesReturnsTotal,
-    collectedDeposits,
-    dailyExpenses,
-    netCash,
-    salesCount,
-    expensesCount,
-    returnsCount,
-  } = dailyTreasury;
+  const handleDownloadBackup = async () => {
+    await exportSystemData();
+    setBackupDownloaded(true);
+  };
 
   const handleConfirmClose = () => {
     closeDayAndResetDrawer(closingNotes);
@@ -108,6 +129,61 @@ export function ZReportConfirmationModal({ isOpen, onClose }) {
               <div className="text-[10px] text-stone-600 italic text-center pt-1">
                 {numberToArabicWords(netCash, storeSettings.currency === 'د.ع' ? 'دينار عراقي' : storeSettings.currency)}
               </div>
+            </div>
+          </div>
+
+          {/* Backup Reminder Banner */}
+          <div
+            className={`p-3.5 rounded-2xl border transition-all ${
+              backupDownloaded
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                : 'bg-amber-50 border-amber-300 text-amber-950'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <HardDrive
+                  className={`w-5 h-5 mt-0.5 shrink-0 ${
+                    backupDownloaded ? 'text-emerald-700' : 'text-amber-700'
+                  }`}
+                />
+                <div>
+                  <div className="font-black text-xs sm:text-sm">
+                    {backupDownloaded
+                      ? 'تم حفظ النسخة الاحتياطية بنجاح ✓'
+                      : 'تنبيه الحفظ الاحتياطي للبيانات (موصى به)'}
+                  </div>
+                  <div className="text-[11px] text-stone-600 font-medium mt-0.5">
+                    {backupDownloaded
+                      ? 'تم تنزيل ملف قاعدة البيانات كاملاً على هذا الجهاز لحماية سجلاتك المالية'
+                      : lastBackupAt
+                      ? `آخر حفظ احتياطي: ${new Date(lastBackupAt).toLocaleDateString('ar-IQ')} (${new Date(lastBackupAt).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })})`
+                      : 'يُنصح بشدة بتحميل نسخة احتياطية من البيانات عند إغلاق اليومية لحماية الحسابات من أي عطل'}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleDownloadBackup}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-xs shrink-0 active:scale-95 ${
+                  backupDownloaded
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-amber-500 hover:bg-amber-600 text-stone-950 border border-amber-600'
+                }`}
+              >
+                {backupDownloaded ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>تم الحفظ ✓</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>تنزيل نسخة</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 

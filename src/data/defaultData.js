@@ -369,8 +369,15 @@ export const DEFAULT_STORE_SETTINGS = {
   managerPin: '1234', // Default Manager Profile Login PIN
   resetPin: '9999',   // Dedicated End-of-Day / Shift Reset PIN
   receiptFooterNote: 'شكراً لاختياركم مسك وزعفران | يسعدنا تقييمكم وزيارتكم مجدداً',
+  staffWhatsAppPhone: '',
   allowSound: true,
   autoPrintReceiptOnPayment: true,
+  // Shift Thresholds & Auto Switch Configuration
+  morningShiftStart: '08:00',
+  morningShiftEnd: '16:00',
+  eveningShiftStart: '16:00',
+  eveningShiftEnd: '02:00',
+  autoShiftSwitchEnabled: true,
 };
 
 export const INITIAL_RESERVATIONS = [
@@ -621,4 +628,57 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
   'فواتير وكهرباء وماء',
   'أخرى',
 ];
+
+export const DEFAULT_RESERVATION_STAFF = [
+  'حيدر',
+  'علي',
+  'أحمد',
+  'محمد',
+  'كرار',
+  'سارة',
+];
+
+export const DEFAULT_CUSTOMERS = [
+  {
+    id: 'cust-1',
+    name: 'أبو فهد التميمي',
+    phone: '07701234567',
+    notes: 'زبون دائم VIP - يفضل الكيك بسكر خفيف ونكهة الزعفران',
+    isVip: true,
+    totalOrders: 14,
+    totalSpent: 420000,
+    lastVisit: '2026-09-28T18:30:00.000Z',
+  },
+  {
+    id: 'cust-2',
+    name: 'أم مريم',
+    phone: '07809876543',
+    notes: 'تطلب كيكات أعياد ميلاد أطفال مع تغليف خاص',
+    isVip: true,
+    totalOrders: 8,
+    totalSpent: 265000,
+    lastVisit: '2026-09-27T16:15:00.000Z',
+  },
+  {
+    id: 'cust-3',
+    name: 'الدكتور حيدر الكعبي',
+    phone: '07715556677',
+    notes: 'يحب تشيز كيك الفستق والقهوة',
+    isVip: false,
+    totalOrders: 5,
+    totalSpent: 85000,
+    lastVisit: '2026-09-25T12:00:00.000Z',
+  },
+  {
+    id: 'cust-4',
+    name: 'شركة النماء للاستثمار',
+    phone: '07901122334',
+    notes: 'طلبيات ضيافة وبوكسات بقلاوة فاخرة للمؤتمرات',
+    isVip: true,
+    totalOrders: 11,
+    totalSpent: 650000,
+    lastVisit: '2026-09-24T10:45:00.000Z',
+  },
+];
+
 

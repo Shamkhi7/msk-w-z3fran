@@ -18,11 +18,16 @@ import {
   ZoomIn,
   Sliders,
   FolderPlus,
+  Clock,
+  Sun,
+  Moon,
+  Users,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { MenuCustomizationModal } from './MenuCustomizationModal';
 import { ManagePresetExpensesModal } from '../expenses/ManagePresetExpensesModal';
 import { ManageExpenseCategoriesModal } from '../expenses/ManageExpenseCategoriesModal';
+import { ManageReservationStaffModal } from '../reservations/ManageReservationStaffModal';
 
 export function StoreSettingsModal({ isOpen, onClose }) {
   const {
@@ -45,6 +50,7 @@ export function StoreSettingsModal({ isOpen, onClose }) {
   const [isMenuCustomizationOpen, setIsMenuCustomizationOpen] = useState(false);
   const [isPresetExpensesOpen, setIsPresetExpensesOpen] = useState(false);
   const [isExpenseCategoriesOpen, setIsExpenseCategoriesOpen] = useState(false);
+  const [isReservationStaffOpen, setIsReservationStaffOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   // Manager PIN Change State
@@ -240,6 +246,26 @@ export function StoreSettingsModal({ isOpen, onClose }) {
                   className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-brand-800"
                 />
               </div>
+
+              {/* Staff WhatsApp Group Phone Setting */}
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-stone-700 mb-1 flex items-center justify-between">
+                  <span className="text-emerald-950 font-bold">
+                    📲 رقم واتساب كروب المعمل / الموظفين (اختياري):
+                  </span>
+                  <span className="text-[10px] text-stone-500 font-normal">
+                    (اتركه فارغاً ليفتح الواتساب قائمة الكروبات لاختيار كروب الموظفين فوراً)
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  name="staffWhatsAppPhone"
+                  value={formData.staffWhatsAppPhone || ''}
+                  onChange={handleChange}
+                  placeholder="0770 000 0000 (أو اتركه فارغاً لاختيار الكروب من القائمة)"
+                  className="w-full bg-emerald-50/50 border border-emerald-300 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -337,6 +363,101 @@ export function StoreSettingsModal({ isOpen, onClose }) {
                 </select>
               </div>
             </div>
+
+            {/* Shift Timings & Auto-Switching Configuration */}
+            <div className="pt-2 border-t border-stone-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-brand-800" />
+                  <span className="text-xs font-black text-brand-900">
+                    مواعيد الورديات والتبديل التلقائي (الصباحي والمسائي)
+                  </span>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-stone-700">
+                  <input
+                    type="checkbox"
+                    name="autoShiftSwitchEnabled"
+                    checked={formData.autoShiftSwitchEnabled !== false}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-brand-800 rounded accent-brand-800 cursor-pointer"
+                  />
+                  <span>تبديل الشفت تلقائياً حسب الوقت</span>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-warm-100/60 p-3 rounded-2xl border border-warm-200/90 text-xs">
+                {/* Morning Shift */}
+                <div className="bg-white p-2.5 rounded-xl border border-amber-200/80 space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900 border-b border-amber-100 pb-1">
+                    <Sun className="w-4 h-4 text-amber-600" />
+                    <span>الشفت الصباحي ☀️</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">من الساعة:</label>
+                      <input
+                        type="time"
+                        name="morningShiftStart"
+                        value={formData.morningShiftStart || '08:00'}
+                        onChange={handleChange}
+                        className="w-full bg-stone-50 border border-stone-300 rounded-lg px-2 py-1 font-mono font-bold text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">إلى الساعة:</label>
+                      <input
+                        type="time"
+                        name="morningShiftEnd"
+                        value={formData.morningShiftEnd || '16:00'}
+                        onChange={handleChange}
+                        className="w-full bg-stone-50 border border-stone-300 rounded-lg px-2 py-1 font-mono font-bold text-xs"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-stone-500">
+                    الافتراضي: من 08:00 صباحاً حتى 04:00 مساءً (16:00).
+                  </p>
+                </div>
+
+                {/* Evening Shift */}
+                <div className="bg-white p-2.5 rounded-xl border border-indigo-200/80 space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold text-indigo-900 border-b border-indigo-100 pb-1">
+                    <Moon className="w-4 h-4 text-indigo-600" />
+                    <span>الشفت المسائي 🌙</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">من الساعة:</label>
+                      <input
+                        type="time"
+                        name="eveningShiftStart"
+                        value={formData.eveningShiftStart || '16:00'}
+                        onChange={handleChange}
+                        className="w-full bg-stone-50 border border-stone-300 rounded-lg px-2 py-1 font-mono font-bold text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">إلى الساعة:</label>
+                      <input
+                        type="time"
+                        name="eveningShiftEnd"
+                        value={formData.eveningShiftEnd || '02:00'}
+                        onChange={handleChange}
+                        className="w-full bg-stone-50 border border-stone-300 rounded-lg px-2 py-1 font-mono font-bold text-xs"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-stone-500">
+                    الافتراضي: من 04:00 مساءً حتى 02:00 بعد منتصف الليل.
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-[10.5px] text-stone-500 leading-snug">
+                * يتم فحص الوقت دورياً كل 30 ثانية؛ ويتم التبديل التلقائي فقط عندما تكون السلة فارغة حرصاً على عدم مقاطعة الفاتورة الحالية.
+              </p>
+            </div>
           </div>
 
           {/* Menu Customization Banner (Manager Only) */}
@@ -416,6 +537,33 @@ export function StoreSettingsModal({ isOpen, onClose }) {
                 className="px-3.5 py-2 bg-warm-100 hover:bg-white text-stone-900 font-black text-xs rounded-xl shadow-xs transition-transform active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
               >
                 إدارة التصنيفات 📁
+              </button>
+            </div>
+          )}
+
+          {/* Reservation Staff Management (Manager Restricted) */}
+          {isManager && (
+            <div className="bg-brand-900 text-white p-3.5 rounded-2xl shadow-xs flex items-center justify-between gap-3 border border-brand-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-brand-950 flex items-center justify-center text-gold-400 border border-gold-500/20 shrink-0">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-black text-warm-50">
+                    إدارة قائمة موظفي الحجوزات
+                  </h4>
+                  <p className="text-[11px] text-warm-200">
+                    إضافة وتعديل وحذف أسماء الكادر والعمال المسؤولين عن تسجيل الحجوزات
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsReservationStaffOpen(true)}
+                className="px-3.5 py-2 bg-warm-100 hover:bg-white text-stone-900 font-black text-xs rounded-xl shadow-xs transition-transform active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
+              >
+                إدارة الموظفين 👥
               </button>
             </div>
           )}
@@ -696,6 +844,12 @@ export function StoreSettingsModal({ isOpen, onClose }) {
       <ManageExpenseCategoriesModal
         isOpen={isExpenseCategoriesOpen}
         onClose={() => setIsExpenseCategoriesOpen(false)}
+      />
+
+      {/* Reservation Staff Modal */}
+      <ManageReservationStaffModal
+        isOpen={isReservationStaffOpen}
+        onClose={() => setIsReservationStaffOpen(false)}
       />
     </div>
   );

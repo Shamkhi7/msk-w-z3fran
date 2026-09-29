@@ -23,6 +23,8 @@ function POSApp() {
     setSessionRestoredNotice,
     toast,
     setToast,
+    shiftNotice,
+    setShiftNotice,
   } = usePOS();
   const [activeTab, setActiveTab] = useState('pos'); // 'pos' | 'reservations' | 'expenses' | 'reports' | 'treasury'
   const [isWelcomeDismissed, setIsWelcomeDismissed] = useState(false);
@@ -165,6 +167,69 @@ function POSApp() {
             <button
               onClick={() => setSessionRestoredNotice(null)}
               className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors mr-2 cursor-pointer"
+              title="إغلاق التنبيه"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated Prominent Auto Shift Switch Alert (Positioned at bottom center, fully visible and clear) */}
+      {shiftNotice && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-70 animate-fade-in pointer-events-auto select-none max-w-lg w-[92vw] sm:w-full">
+          <div
+            className={`relative p-4 rounded-2xl shadow-2xl border-2 flex items-center gap-3.5 bg-white transition-all ${
+              shiftNotice.shift === 'صباحي'
+                ? 'border-amber-400 shadow-amber-950/20 ring-4 ring-amber-400/20'
+                : 'border-indigo-500 shadow-indigo-950/20 ring-4 ring-indigo-400/20'
+            }`}
+          >
+            {/* Shift Icon */}
+            <div
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-xs ${
+                shiftNotice.shift === 'صباحي'
+                  ? 'bg-amber-100 border border-amber-300 text-amber-900'
+                  : 'bg-indigo-100 border border-indigo-300 text-indigo-950'
+              }`}
+            >
+              {shiftNotice.shiftIcon}
+            </div>
+
+            {/* Notification Text Area */}
+            <div className="flex-1 text-right min-w-0 pr-1 pl-8">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-black text-sm text-stone-900">
+                  تنبيه: تم تبديل الشفت تلقائياً
+                </span>
+                <span
+                  className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border ${
+                    shiftNotice.shift === 'صباحي'
+                      ? 'bg-amber-100 text-amber-950 border-amber-300'
+                      : 'bg-indigo-100 text-indigo-950 border-indigo-300'
+                  }`}
+                >
+                  {shiftNotice.shiftName}
+                </span>
+                <span className="text-xs font-mono text-stone-600 font-bold mr-auto">
+                  {shiftNotice.time}
+                </span>
+              </div>
+
+              <p className="text-xs mt-1.5 text-stone-800 leading-relaxed font-bold">
+                {shiftNotice.message}
+              </p>
+
+              <div className="text-[11px] text-stone-700 font-semibold mt-2 flex items-center gap-2 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse shrink-0" />
+                <span>العمل مستمر دون انقطاع؛ تُسجل الفواتير الجديدة على هذا الشفت.</span>
+              </div>
+            </div>
+
+            {/* Corner Close Button */}
+            <button
+              onClick={() => setShiftNotice(null)}
+              className="absolute left-3 top-3 text-stone-400 hover:text-stone-900 p-1.5 rounded-lg hover:bg-stone-100 transition-colors cursor-pointer"
               title="إغلاق التنبيه"
             >
               <X className="w-4 h-4" />

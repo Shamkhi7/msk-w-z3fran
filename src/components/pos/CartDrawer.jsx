@@ -11,6 +11,7 @@ import {
   Printer,
   Zap,
   CheckCircle,
+  Truck,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { PaymentModal } from './PaymentModal';
@@ -22,6 +23,7 @@ export function CartDrawer() {
     updateItemQuantity,
     removeFromCart,
     clearCart,
+    setCartDeliveryFee,
     overrideCartItemPrice,
     applyCartItemDiscount,
     cartSummary,
@@ -486,7 +488,7 @@ export function CartDrawer() {
           <div className="flex justify-between items-baseline pt-2 border-t border-stone-200 text-sm sm:text-base font-black text-brand-900">
             <span>المبلغ الصافي للدفع:</span>
             <div className="text-left font-mono text-xl sm:text-2xl text-brand-800">
-              {cartSummary.netTotal.toLocaleString()}{' '}
+              {cartSummary.itemsNet.toLocaleString()}{' '}
               <span className="text-xs font-sans font-normal text-stone-600">
                 {storeSettings.currency}
               </span>

@@ -13,9 +13,11 @@ import {
   UserCheck,
   BarChart3,
   LogOut,
+  Users,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { RoleSwitchModal } from './RoleSwitchModal';
+import { CustomerDirectoryModal } from '../customers/CustomerDirectoryModal';
 
 export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome }) {
   const {
@@ -27,10 +29,14 @@ export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome 
     activeCashier,
     isManager,
     activeShiftType,
+    switchShift,
+    isSingleInvoiceShiftOverride,
+    urgentReservationsCount,
   } = usePOS();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
 
   // Sync fullscreen state with both Electron desktop app and web browser
   React.useEffect(() => {
@@ -88,8 +94,16 @@ export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome 
       label: 'الحجوزات',
       shortLabel: 'الحجوزات',
       icon: CalendarDays,
-      badge: pendingReservationsCount > 0 ? pendingReservationsCount : null,
-      badgeColor: 'bg-rose-600 text-white',
+      badge:
+        urgentReservationsCount > 0
+          ? `${urgentReservationsCount} عاجل ⚡`
+          : pendingReservationsCount > 0
+          ? pendingReservationsCount
+          : null,
+      badgeColor:
+        urgentReservationsCount > 0
+          ? 'bg-rose-600 text-white animate-pulse font-black ring-1 ring-white/60'
+          : 'bg-rose-600 text-white',
     },
     {
       id: 'expenses',
@@ -196,14 +210,24 @@ export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome 
               </>
             )}
             <span
-              className={`text-[10px] px-1.5 py-0.5 rounded-md font-black flex items-center gap-0.5 shrink-0 ${
+              onClick={(e) => {
+                e.stopPropagation();
+                switchShift(activeShiftType === 'صباحي' ? 'مسائي' : 'صباحي');
+              }}
+              title="نقر سريع: تبديل الشفت مؤقتاً (لفاتورة واحدة فقط ثم العودة تلقائياً بعد البيع)"
+              className={`text-[10px] px-2 py-0.5 rounded-lg font-black flex items-center gap-1 shrink-0 transition-transform active:scale-95 cursor-pointer hover:opacity-95 ${
                 activeShiftType === 'صباحي'
-                  ? 'bg-amber-400/25 text-amber-300 border border-amber-400/40'
-                  : 'bg-indigo-400/25 text-indigo-300 border border-indigo-400/40'
-              }`}
+                  ? 'bg-amber-400/30 text-amber-200 border border-amber-400/50'
+                  : 'bg-indigo-400/30 text-indigo-200 border border-indigo-400/50'
+              } ${isSingleInvoiceShiftOverride ? 'ring-2 ring-gold-400 animate-pulse' : ''}`}
             >
               <span>{activeShiftType === 'صباحي' ? '☀️' : '🌙'}</span>
               <span className="whitespace-nowrap">{activeShiftType}</span>
+              {isSingleInvoiceShiftOverride && (
+                <span className="text-[9px] bg-gold-400 text-stone-950 px-1 py-0.2 rounded font-black shadow-2xs">
+                  مؤقت ⚡
+                </span>
+              )}
             </span>
           </button>
 
@@ -217,6 +241,18 @@ export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome 
             <span className="hidden xl:inline whitespace-nowrap">تبديل الشفت / خروج</span>
             <span className="xl:hidden whitespace-nowrap">تبديل</span>
           </button>
+
+          {/* Action Button: [الزبائن] - مخصص للمدير فقط */}
+          {isManager && (
+            <button
+              onClick={() => setIsCustomerModalOpen(true)}
+              title="سجل ودليل الزبائن الدائمين ومتابعة مشترياتهم وتفضيلاتهم (صلاحية المدير فقط)"
+              className="px-2 sm:px-2.5 py-1.2 sm:py-1.5 rounded-xl text-xs sm:text-[13px] font-bold flex items-center gap-1.5 transition-all cursor-pointer border shrink-0 whitespace-nowrap bg-brand-950/80 hover:bg-brand-950 text-warm-100 border-gold-500/40 hover:text-white shadow-xs active:scale-95"
+            >
+              <Users className="w-3.5 h-3.5 text-gold-400 shrink-0" />
+              <span className="whitespace-nowrap">الزبائن</span>
+            </button>
+          )}
 
           {/* Action Button: [الصندوق] */}
           <button
@@ -275,6 +311,12 @@ export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome 
       <RoleSwitchModal
         isOpen={isRoleModalOpen}
         onClose={() => setIsRoleModalOpen(false)}
+      />
+
+      {/* Customer Directory Modal */}
+      <CustomerDirectoryModal
+        isOpen={isCustomerModalOpen}
+        onClose={() => setIsCustomerModalOpen(false)}
       />
     </header>
   );
