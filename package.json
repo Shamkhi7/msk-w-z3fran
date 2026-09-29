@@ -52,10 +52,11 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "مسك وزعفران POS"
+      "shortcutName": "مسك وزعفران POS",
+      "artifactName": "${productName} Setup ${version}-${arch}.${ext}"
     },
     "portable": {
-      "artifactName": "Musk-Zafran-POS-Portable.exe"
+      "artifactName": "Musk-Zafran-POS-Portable-${arch}.${ext}"
     }
   },
   "dependencies": {
