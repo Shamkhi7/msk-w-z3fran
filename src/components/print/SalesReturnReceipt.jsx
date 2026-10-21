@@ -1,10 +1,12 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
 import { ReceiptBrandingFooter } from './ReceiptBrandingFooter';
+import { getReceiptTypography } from '../../utils/receiptTypographyHelper';
 
 export function SalesReturnReceipt({ returnData, storeSettings }) {
   if (!returnData) return null;
 
+  const typo = getReceiptTypography(storeSettings);
   const dateObj = new Date(returnData.date);
   const formattedDate = dateObj.toLocaleDateString('ar-IQ', {
     year: 'numeric',
@@ -19,7 +21,7 @@ export function SalesReturnReceipt({ returnData, storeSettings }) {
   const amount = Number(returnData.amount) || 0;
 
   return (
-    <div className="receipt-container text-black bg-white select-none font-bold" style={{ color: '#000' }}>
+    <div className="receipt-container text-black bg-white select-none font-bold" style={typo.containerStyle}>
       {/* Header */}
       <div className="text-center pb-2 border-b-2 border-black">
         <div className="text-base font-black tracking-wide text-black">{storeSettings.storeNameAr}</div>

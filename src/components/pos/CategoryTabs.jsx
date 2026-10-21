@@ -16,7 +16,7 @@ const iconMap = {
   Tag,
 };
 
-export function CategoryTabs({ onOpenAddCategory }) {
+export const CategoryTabs = React.memo(function CategoryTabs({ onOpenAddCategory }) {
   const {
     categories,
     activeCategory,
@@ -307,4 +307,4 @@ export function CategoryTabs({ onOpenAddCategory }) {
       />
     </>
   );
-}
+});

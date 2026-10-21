@@ -25,6 +25,9 @@ import {
   Send,
   MessageSquare,
   Camera,
+  Truck,
+  CreditCard,
+  Banknote,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { formatPickupDateTime, getArabicWeekday } from '../../utils/dateFormatter';
@@ -117,8 +120,17 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
   // Consolidated Financials
   const [totalCost, setTotalCost] = useState('35000');
   const [depositPaid, setDepositPaid] = useState('15000');
+  const [depositPaymentMethod, setDepositPaymentMethod] = useState('نقداً'); // 'نقداً' | 'بطاقة'
   const [notes, setNotes] = useState('');
   const [ringUpDeposit, setRingUpDeposit] = useState(true);
+
+  // Delivery Information
+  const [isDelivery, setIsDelivery] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryPhone, setDeliveryPhone] = useState('');
+  const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [deliveryFee, setDeliveryFee] = useState('0');
+
   const [autoSendWhatsApp, setAutoSendWhatsApp] = useState(false);
   const [imageModalReservation, setImageModalReservation] = useState(null);
 
@@ -229,7 +241,13 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
         setWorkerName(initialData.workerName || '');
         setTotalCost(String(initialData.totalCost || 0));
         setDepositPaid(String(initialData.depositPaid || 0));
+        setDepositPaymentMethod(initialData.depositPaymentMethod || 'نقداً');
         setNotes(initialData.notes || '');
+        setIsDelivery(Boolean(initialData.isDelivery));
+        setDeliveryAddress(initialData.deliveryAddress || '');
+        setDeliveryPhone(initialData.deliveryPhone || initialData.phone || '');
+        setDeliveryNotes(initialData.deliveryNotes || '');
+        setDeliveryFee(String(initialData.deliveryFee || 0));
         setRingUpDeposit(false);
       } else {
         setCustomerName('');
@@ -255,7 +273,13 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
         setSlicesFlavor('');
         setTotalCost('35000');
         setDepositPaid('15000');
+        setDepositPaymentMethod('نقداً');
         setNotes('');
+        setIsDelivery(false);
+        setDeliveryAddress('');
+        setDeliveryPhone('');
+        setDeliveryNotes('');
+        setDeliveryFee('0');
         setRingUpDeposit(true);
       }
     }
@@ -419,6 +443,14 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
       totalPieces: includeSlices ? slicesMetrics.totalPieces : 0,
       slicesTotal: includeSlices ? slicesMetrics.slicesTotal : 0,
       slicesFlavor: includeSlices ? slicesFlavor.trim() : '',
+      // Delivery Information
+      isDelivery,
+      deliveryAddress: isDelivery ? deliveryAddress.trim() : '',
+      deliveryPhone: isDelivery ? (deliveryPhone.trim() || phone.trim()) : '',
+      deliveryNotes: isDelivery ? deliveryNotes.trim() : '',
+      deliveryFee: isDelivery ? (Number(deliveryFee) || 0) : 0,
+      // Deposit Payment Method
+      depositPaymentMethod,
       // Consolidated Financials
       totalCost: numTotal,
       depositPaid: numDeposit,
@@ -744,6 +776,107 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
                   {formatPickupDateTime(pickupDate, pickupTime)}
                 </span>
               </div>
+            </div>
+
+            {/* Delivery Option & Address Block */}
+            <div
+              className={`p-3.5 rounded-2xl border-2 transition-all ${
+                isDelivery
+                  ? 'bg-blue-50/70 border-blue-400 shadow-xs'
+                  : 'bg-white border-warm-200'
+              }`}
+            >
+              <label className="flex items-center justify-between cursor-pointer select-none">
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={isDelivery}
+                    onChange={(e) => {
+                      setIsDelivery(e.target.checked);
+                      if (e.target.checked && !deliveryPhone) {
+                        setDeliveryPhone(phone);
+                      }
+                    }}
+                    className="w-4 h-4 text-blue-600 rounded accent-blue-600 cursor-pointer"
+                  />
+                  <div className="text-xs font-bold flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-blue-700 shrink-0" />
+                    <span className="font-black text-blue-950">
+                      🛵 طلب توصيل خارجي / دليفري
+                    </span>
+                  </div>
+                </div>
+                {isDelivery ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-600 text-white shadow-2xs animate-pulse">
+                    مفعل للتوصيل
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-stone-400">
+                    استلام من المحل
+                  </span>
+                )}
+              </label>
+
+              {isDelivery && (
+                <div className="mt-3 pt-3 border-t border-blue-200 space-y-2.5 animate-fade-in">
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">
+                      📍 عنوان التوصيل بالتفصيل:
+                    </label>
+                    <input
+                      type="text"
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      placeholder="المنطقة، أقرب نقطة دالة، رقم الزقاق / الدار..."
+                      className="w-full bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      required={isDelivery}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-stone-700 mb-1">
+                        📞 هاتف التوصيل / المستلم:
+                      </label>
+                      <input
+                        type="text"
+                        value={deliveryPhone}
+                        onChange={(e) => setDeliveryPhone(e.target.value)}
+                        placeholder={phone || '07xxxxxxxxx'}
+                        className="w-full bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-stone-700 mb-1">
+                        🛵 أجور التوصيل ({storeSettings.currency}) (للسائق):
+                      </label>
+                      <input
+                        type="number"
+                        value={deliveryFee}
+                        onChange={(e) => setDeliveryFee(e.target.value)}
+                        step="500"
+                        min="0"
+                        placeholder="0"
+                        className="w-full bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">
+                      📝 ملاحظات خاصة بالتوصيل والسائق:
+                    </label>
+                    <input
+                      type="text"
+                      value={deliveryNotes}
+                      onChange={(e) => setDeliveryNotes(e.target.value)}
+                      placeholder="مثال: الاتصال قبل التحرك، وقت الحفلة الساعة 8..."
+                      className="w-full bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ========================================================= */}
@@ -1233,6 +1366,46 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
                 </div>
               </div>
 
+              {/* Deposit Payment Method Selector */}
+              {numDeposit > 0 && (
+                <div className="bg-stone-50 border border-stone-200 p-2.5 rounded-xl space-y-1.5">
+                  <label className="block text-xs font-bold text-stone-700">
+                    طريقة دفع واستلام العربون:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDepositPaymentMethod('نقداً')}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        depositPaymentMethod === 'نقداً'
+                          ? 'bg-emerald-700 text-white shadow-xs font-black'
+                          : 'bg-white text-stone-700 border border-stone-200 hover:bg-stone-100'
+                      }`}
+                    >
+                      <Banknote className="w-4 h-4" />
+                      <span>💵 نقدي (كاش الصندوق)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDepositPaymentMethod('بطاقة')}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        depositPaymentMethod === 'بطاقة'
+                          ? 'bg-blue-600 text-white shadow-xs font-black'
+                          : 'bg-white text-stone-700 border border-stone-200 hover:bg-stone-100'
+                      }`}
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      <span>💳 بطاقة / إلكتروني (Qi / Master)</span>
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-stone-500">
+                    {depositPaymentMethod === 'بطاقة'
+                      ? '• سيتم عزل العربون بالكامل عن نقدية الصندوق واحتسابه ضمن مقبوضات الدفع الإلكتروني'
+                      : '• سيتم إدراج العربون ضمن نقدية كاش الصندوق'}
+                  </div>
+                </div>
+              )}
+
               {/* Checkbox: Ring up deposit to drawer right now */}
               <label className="flex items-center gap-2 cursor-pointer pt-1 text-xs font-bold text-stone-700 select-none">
                 <input
@@ -1242,7 +1415,7 @@ export function ReservationFormModal({ isOpen, onClose, initialData = null }) {
                   className="w-4 h-4 text-brand-800 rounded accent-brand-800 cursor-pointer"
                 />
                 <span>
-                  إدراج العربون ({numDeposit.toLocaleString()} {storeSettings.currency}) مباشرة في صندوق اليومية الحالي كعربون مقبوض
+                  إدراج العربون ({numDeposit.toLocaleString()} {storeSettings.currency}) مباشرة في صندوق اليومية الحالي كعربون مقبوض ({depositPaymentMethod === 'بطاقة' ? 'دفع إلكتروني معزول' : 'كاش الصندوق'})
                 </span>
               </label>
             </div>

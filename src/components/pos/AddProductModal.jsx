@@ -13,12 +13,17 @@ export function AddProductModal({ isOpen, onClose, defaultCategoryId }) {
   const [price, setPrice] = useState('');
   const [cost, setCost] = useState('');
   const [barcode, setBarcode] = useState('');
+  const [pricingMode, setPricingMode] = useState(
+    defaultCategoryId === 'cat-sweets' ? 'weight' : 'unit'
+  );
 
   if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim() || !price) return;
+
+    const isWeighted = pricingMode === 'weight';
 
     addProduct({
       name: name.trim(),
@@ -27,12 +32,16 @@ export function AddProductModal({ isOpen, onClose, defaultCategoryId }) {
       price: Number(price),
       cost: Number(cost) || 0,
       barcode: barcode.trim() || undefined,
+      pricingMode,
+      isWeighted,
+      unit: isWeighted ? 'kg' : 'piece',
     });
 
     setName('');
     setDescription('');
     setPrice('');
     setCost('');
+    setPricingMode('unit');
     onClose();
   };
 
@@ -141,6 +150,42 @@ export function AddProductModal({ isOpen, onClose, defaultCategoryId }) {
                 placeholder="MZ-xxxx"
                 className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-800"
               />
+            </div>
+          </div>
+
+          {/* Product Pricing Mode Selector */}
+          <div>
+            <label className="block text-xs font-bold text-stone-700 mb-1.5">
+              طريقة البيع / نوع التسعير:
+            </label>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-stone-100 rounded-xl border border-stone-200">
+              <button
+                type="button"
+                onClick={() => setPricingMode('unit')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  pricingMode === 'unit'
+                    ? 'bg-white text-brand-900 shadow-sm border border-stone-200 font-black'
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                <span>📦 بالكمية / بالقطعة</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPricingMode('weight')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  pricingMode === 'weight'
+                    ? 'bg-amber-500 text-stone-950 shadow-sm font-black'
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                <span>⚖️ بالوزن / بالكيلو</span>
+              </button>
+            </div>
+            <div className="text-[10px] text-stone-500 mt-1 px-1">
+              {pricingMode === 'weight'
+                ? '• يباع بالكيلوغرام: يفعّل حقول الوزن والاحتساب العكسي للأوزان وشارة "بالوزن"'
+                : '• يباع بالقطعة: بيع عادي بالكمية والأعداد الصحيحة'}
             </div>
           </div>
 

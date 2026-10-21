@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShoppingBag,
   CalendarDays,
   Receipt,
   Wallet,
   Settings,
-  Volume2,
-  VolumeX,
+  Clock,
   Maximize,
   Minimize,
   ShieldCheck,
@@ -19,10 +18,48 @@ import { usePOS } from '../../context/POSContext';
 import { RoleSwitchModal } from './RoleSwitchModal';
 import { CustomerDirectoryModal } from '../customers/CustomerDirectoryModal';
 
+/**
+ * Role-Conditional Live Date & Time Widget (Cashier Only)
+ * Self-contained component to isolate 1-second interval re-renders from POS catalog & cart.
+ */
+function CashierLiveDateTime() {
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const hours = currentTime.getHours();
+  const minutes = currentTime.getMinutes().toString().padStart(2, '0');
+  const isPM = hours >= 12;
+  const h12 = hours % 12 || 12;
+  const ampm = isPM ? 'م' : 'ص';
+  const timeStr = `${h12}:${minutes} ${ampm}`;
+
+  const year = currentTime.getFullYear();
+  const month = (currentTime.getMonth() + 1).toString().padStart(2, '0');
+  const day = currentTime.getDate().toString().padStart(2, '0');
+  const dateStr = `${year}/${month}/${day}`;
+
+  return (
+    <div
+      className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-brand-950/70 border border-gold-500/30 text-xs shadow-inner shrink-0 select-none animate-fade-in"
+      title={`الوقت والتاريخ المباشر: ${timeStr} | ${dateStr}`}
+    >
+      <Clock className="w-3.5 h-3.5 text-gold-400 shrink-0" />
+      <span className="font-mono font-bold text-gold-200 text-xs sm:text-[13px]">{timeStr}</span>
+      <span className="text-gold-500/40 text-[11px] font-sans font-bold">|</span>
+      <span className="font-mono font-bold text-warm-200 text-xs sm:text-[12px]">{dateStr}</span>
+    </div>
+  );
+}
+
 export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome }) {
   const {
     storeSettings,
-    setStoreSettings,
     dailyTreasury,
     reservations,
     cartSummary,
@@ -66,13 +103,6 @@ export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome 
         setIsFullscreen(false);
       }
     }
-  };
-
-  const toggleSound = () => {
-    setStoreSettings((prev) => ({
-      ...prev,
-      allowSound: !prev.allowSound,
-    }));
   };
 
   const pendingReservationsCount = reservations.filter(
@@ -121,6 +151,13 @@ export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome 
             icon: BarChart3,
             badge: null,
           },
+          {
+            id: 'settings',
+            label: 'الإعدادات',
+            shortLabel: 'الإعدادات',
+            icon: Settings,
+            badge: null,
+          },
         ]
       : []),
   ];
@@ -156,35 +193,40 @@ export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome 
           </div>
         </div>
 
-        {/* Center: Primary Navigation Tabs */}
-        <nav className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          {coreNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`relative px-2 sm:px-2.5 py-1.2 sm:py-1.5 rounded-xl text-xs sm:text-[13px] font-bold flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-                  isActive
-                    ? 'bg-warm-50 text-brand-900 shadow-md font-black translate-y-[-1px]'
-                    : 'text-warm-100 hover:bg-brand-700/70 hover:text-white'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-brand-800' : 'text-gold-400'} shrink-0`} />
-                <span className="whitespace-nowrap">{item.label}</span>
+        {/* Center: Primary Navigation Tabs & Cashier Live Date/Time Widget */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <nav className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            {coreNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`relative px-2 sm:px-2.5 py-1.2 sm:py-1.5 rounded-xl text-xs sm:text-[13px] font-bold flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+                    isActive
+                      ? 'bg-warm-50 text-brand-900 shadow-md font-black translate-y-[-1px]'
+                      : 'text-warm-100 hover:bg-brand-700/70 hover:text-white'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-brand-800' : 'text-gold-400'} shrink-0`} />
+                  <span className="whitespace-nowrap">{item.label}</span>
 
-                {item.badge !== null && (
-                  <span
-                    className={`text-[10px] font-black font-mono px-1.5 py-0.2 rounded-full leading-tight shadow-sm shrink-0 ${item.badgeColor}`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+                  {item.badge !== null && (
+                    <span
+                      className={`text-[10px] font-black font-mono px-1.5 py-0.2 rounded-full leading-tight shadow-sm shrink-0 ${item.badgeColor}`}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Role-Conditional Live Date & Time Widget: Cashier Only */}
+          {!isManager && <CashierLiveDateTime />}
+        </div>
 
         {/* Left Side: Cashier Profile Badge, Treasury Action Button, and Utilities */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
@@ -271,18 +313,6 @@ export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome 
           {/* Utility Controls */}
           <div className="flex items-center gap-0.5 sm:gap-1 border-r border-brand-700/60 pr-1 mr-0.5 shrink-0">
             <button
-              onClick={toggleSound}
-              title={storeSettings.allowSound ? 'كتم التنبيهات الصوتية' : 'تفعيل التنبيهات الصوتية'}
-              className="w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-lg bg-brand-700/60 hover:bg-brand-700 flex items-center justify-center text-warm-200 hover:text-white transition-colors cursor-pointer shrink-0"
-            >
-              {storeSettings.allowSound ? (
-                <Volume2 className="w-3.5 h-3.5 text-gold-400" />
-              ) : (
-                <VolumeX className="w-3.5 h-3.5 text-warm-400" />
-              )}
-            </button>
-
-            <button
               onClick={toggleFullscreen}
               title={isFullscreen ? 'تصغير الشاشة (F11)' : 'ملء الشاشة بالكامل (F11)'}
               className="w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-lg bg-brand-700/60 hover:bg-brand-700 flex items-center justify-center text-warm-200 hover:text-white transition-colors cursor-pointer shrink-0"
@@ -293,16 +323,6 @@ export function Header({ activeTab, setActiveTab, onOpenSettings, onOpenWelcome 
                 <Maximize className="w-3.5 h-3.5 text-gold-400" />
               )}
             </button>
-
-            {isManager && (
-              <button
-                onClick={onOpenSettings}
-                title="إعدادات النظام والنسخ الاحتياطي (المدير فقط)"
-                className="w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-lg bg-brand-700/60 hover:bg-brand-700 flex items-center justify-center text-warm-200 hover:text-white transition-colors cursor-pointer shrink-0"
-              >
-                <Settings className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
         </div>
       </div>

@@ -5,8 +5,9 @@ import { ProductEditModal } from './ProductEditModal';
 import { ServiceItemModal } from './ServiceItemModal';
 import { SalesReturnModal } from './SalesReturnModal';
 import { ManagerPinModal } from '../treasury/ManagerPinModal';
+import { isWeightedProduct } from '../../utils/productAnalyticsHelper';
 
-export function ProductGrid({ onOpenAddProduct }) {
+export const ProductGrid = React.memo(function ProductGrid({ onOpenAddProduct }) {
   const {
     products,
     activeCategory,
@@ -366,19 +367,27 @@ export function ProductGrid({ onOpenAddProduct }) {
                     {product.price.toLocaleString()}{' '}
                     <span className={`${gridConfig.currencySize} font-sans font-normal text-stone-500`}>
                       {storeSettings.currency}
+                      {isWeightedProduct(product) || product.unit === 'kg' ? ' / كغم' : ''}
                     </span>
                   </div>
 
-                  {!isAvailable && (
-                    <span className={`${gridConfig.badgeSize} rounded bg-rose-100 text-rose-700 font-bold`}>
-                      غير متاح
-                    </span>
-                  )}
-                  {isService && (
-                    <span className={`${gridConfig.badgeSize} rounded bg-emerald-100 text-emerald-800 font-bold`}>
-                      خدمة
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {(isWeightedProduct(product) || product.unit === 'kg') && (
+                      <span className={`${gridConfig.badgeSize} rounded bg-amber-100 text-amber-900 font-black border border-amber-300`}>
+                        كغم
+                      </span>
+                    )}
+                    {!isAvailable && (
+                      <span className={`${gridConfig.badgeSize} rounded bg-rose-100 text-rose-700 font-bold`}>
+                        غير متاح
+                      </span>
+                    )}
+                    {isService && (
+                      <span className={`${gridConfig.badgeSize} rounded bg-emerald-100 text-emerald-800 font-bold`}>
+                        خدمة
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -445,4 +454,4 @@ export function ProductGrid({ onOpenAddProduct }) {
       />
     </div>
   );
-}
+});

@@ -22,6 +22,7 @@ import {
   Sun,
   Moon,
   Users,
+  Type,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { MenuCustomizationModal } from './MenuCustomizationModal';
@@ -321,6 +322,146 @@ export function StoreSettingsModal({ isOpen, onClose }) {
                 onChange={handleChange}
                 className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-800"
               />
+            </div>
+
+            {/* Thermal Receipt Typography & Print Settings */}
+            <div className="pt-3 border-t border-stone-200 space-y-3">
+              <div className="flex items-center justify-between border-b border-warm-200 pb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Type className="w-4 h-4 text-brand-800" />
+                  <h4 className="text-xs font-black text-brand-900">
+                    إعدادات خط وطباعة الوصولات الحرارية (Thermal Receipt Typography)
+                  </h4>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-warm-100 text-stone-700 border border-warm-300">
+                  طابعة حرارية 80mm
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 1. Base Font Size */}
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">
+                    حجم الخط الأساسي:
+                  </label>
+                  <select
+                    name="receiptFontSize"
+                    value={formData.receiptFontSize || 13}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, receiptFontSize: Number(e.target.value) }))}
+                    className="w-full bg-white border border-stone-300 rounded-xl px-2.5 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-800 cursor-pointer"
+                  >
+                    <option value={11}>صغير جداً (11px)</option>
+                    <option value={12}>صغير (12px)</option>
+                    <option value={13}>متوسط قياسي (13px - الافتراضي)</option>
+                    <option value={14}>متوسط واضح (14px)</option>
+                    <option value={16}>كبير (16px)</option>
+                    <option value={18}>كبير جداً (18px)</option>
+                  </select>
+                </div>
+
+                {/* 2. Font Weight / Boldness */}
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">
+                    سُمك وسواد الخط (Font Weight):
+                  </label>
+                  <select
+                    name="receiptFontWeight"
+                    value={formData.receiptFontWeight || 'bold'}
+                    onChange={handleChange}
+                    className="w-full bg-white border border-stone-300 rounded-xl px-2.5 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-800 cursor-pointer"
+                  >
+                    <option value="normal">عادي (Normal 500)</option>
+                    <option value="bold">عريض (Bold 700 - موصى به)</option>
+                    <option value="heavy">عريض جداً (Heavy 900 - سواد فائق)</option>
+                  </select>
+                </div>
+
+                {/* 3. Ticket Header & Crucial Info Scaling */}
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">
+                    تكبير البيانات المهمة (الاسم/الوصل):
+                  </label>
+                  <select
+                    name="receiptHeaderScale"
+                    value={formData.receiptHeaderScale !== undefined ? formData.receiptHeaderScale : 2}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, receiptHeaderScale: Number(e.target.value) }))}
+                    className="w-full bg-white border border-stone-300 rounded-xl px-2.5 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-800 cursor-pointer"
+                  >
+                    <option value={0}>قياسي (+0px - بنفس الحجم)</option>
+                    <option value={2}>تكبير معتدل (+2px - موصى به)</option>
+                    <option value={4}>تكبير بارز للشيف (+4px)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Interactive Live Typography Preview Box */}
+              <div className="bg-warm-100/70 border border-warm-200 rounded-2xl p-3 space-y-2 select-none">
+                <div className="flex items-center justify-between text-[11px] font-bold text-stone-600 border-b border-warm-200/80 pb-1">
+                  <span>معاينة حية لمظهر وخط الوصل الحراري:</span>
+                  <span className="text-brand-900 font-mono text-[10px] font-black">
+                    {formData.receiptFontSize || 13}px • {formData.receiptFontWeight === 'heavy' ? 'سواد فائق 900' : formData.receiptFontWeight === 'normal' ? 'عادي 500' : 'عريض ناصع 700'} • (+{formData.receiptHeaderScale ?? 2}px للبيانات المهمة)
+                  </span>
+                </div>
+
+                <div
+                  className="bg-white border-2 border-black rounded-xl p-3 mx-auto text-black shadow-xs space-y-2"
+                  style={{
+                    maxWidth: '260px',
+                    fontSize: `${formData.receiptFontSize || 13}px`,
+                    fontWeight: formData.receiptFontWeight === 'heavy' ? 900 : formData.receiptFontWeight === 'normal' ? 500 : 700,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  <div className="text-center border-b-2 border-black pb-1.5">
+                    <div style={{ fontSize: `${(formData.receiptFontSize || 13) + (formData.receiptHeaderScale ?? 2) + 3}px`, fontWeight: 900 }}>
+                      {formData.storeNameAr || 'مسك وزعفران'}
+                    </div>
+                    <div className="text-[10px] text-stone-600 font-bold">وصل حجز كيك / مبيعات</div>
+                  </div>
+
+                  <div className="space-y-1">
+                    {/* Crucial Manual Ticket # */}
+                    <div className="border border-black p-1 text-center bg-stone-50">
+                      <span className="text-[9.5px] block font-bold">رقم الحجز اليدوي:</span>
+                      <span className="font-mono font-black" style={{ fontSize: `${(formData.receiptFontSize || 13) + (formData.receiptHeaderScale ?? 2) + 2}px` }}>
+                        #104
+                      </span>
+                    </div>
+
+                    {/* Crucial Customer Name */}
+                    <div className="flex justify-between border-b border-dashed border-stone-300 pb-0.5">
+                      <span className="font-bold">الزبون:</span>
+                      <span style={{ fontSize: `${(formData.receiptFontSize || 13) + (formData.receiptHeaderScale ?? 2)}px`, fontWeight: 900 }}>
+                        أم مريم الجبوري
+                      </span>
+                    </div>
+
+                    {/* Line Item */}
+                    <div className="flex justify-between text-[11px]">
+                      <span>كيكة الزعفران الملكية (1)</span>
+                      <span className="font-mono font-bold">32,000 د.ع</span>
+                    </div>
+
+                    {/* Crucial Chef Notes */}
+                    <div className="p-1.5 bg-stone-100 border border-stone-300 rounded-lg text-[10.5px]">
+                      <span className="block font-bold">ملاحظات الشيف والمعمل:</span>
+                      <span style={{ fontSize: `${(formData.receiptFontSize || 13) + (formData.receiptHeaderScale ?? 2)}px`, fontWeight: 900 }}>
+                        "كيكة فانيلا مع عبارة مبروك التخرج"
+                      </span>
+                    </div>
+
+                    {/* Total */}
+                    <div className="flex justify-between pt-1 border-t-2 border-black font-black" style={{ fontSize: `${(formData.receiptFontSize || 13) + 1}px` }}>
+                      <span>المجموع الكلي:</span>
+                      <span className="font-mono text-black font-black">32,000 د.ع</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-stone-500 text-center leading-snug">
+                  * تم ضبط عرض الطباعة ليلائم رول 80mm القياسي (عرض 72.1mm) لمنع أي اقتطاع عرضي للنصوص عند اختيار الخطوط الكبيرة.
+                </div>
+              </div>
             </div>
 
             {/* Separate Independent Scale Preferences: Categories & Products */}

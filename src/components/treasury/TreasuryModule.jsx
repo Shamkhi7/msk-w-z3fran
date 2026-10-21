@@ -19,6 +19,8 @@ import {
   Moon,
   Trash2,
   Truck,
+  CreditCard,
+  Edit3,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { ManagerPinModal } from './ManagerPinModal';
@@ -43,6 +45,7 @@ export function TreasuryModule() {
     storeSettings,
     isManager,
     userRole,
+    openEditSaleModal,
   } = usePOS();
 
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
@@ -82,6 +85,7 @@ export function TreasuryModule() {
     netDirectSales,
     collectedDeposits,
     dailyExpenses,
+    electronicPaymentsTotal,
     netCash,
     sessionSales,
     sessionExpenses,
@@ -245,146 +249,8 @@ export function TreasuryModule() {
         </div>
       </div>
 
-      {/* Success Notification Notice */}
-      {successNotice && (
-        <div className="mx-3 sm:mx-4 mt-3 p-3.5 bg-emerald-50 border-2 border-emerald-400 text-emerald-950 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold animate-fade-in shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle className="w-5 h-5 text-emerald-700 shrink-0" />
-            <span>{successNotice}</span>
-          </div>
-          <button
-            onClick={() => setSuccessNotice('')}
-            className="text-emerald-800 hover:text-emerald-950 px-2 py-1 bg-emerald-100 rounded-lg text-xs font-bold cursor-pointer"
-          >
-            إغلاق الإشعار
-          </button>
-        </div>
-      )}
-
-      {/* Dynamic Financial KPI Cards */}
-      <div className="p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        {/* 1. Total Direct Sales Revenue */}
-        <div className="bg-white p-3.5 rounded-2xl border border-warm-200 shadow-xs hover:border-brand-700/30 transition-all flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-stone-500">1. المبيعات المباشرة:</span>
-            <div className="w-7 h-7 rounded-lg bg-brand-50 text-brand-800 flex items-center justify-center">
-              <ArrowUpRight className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-xl sm:text-2xl font-mono font-black text-brand-900">
-              {directSales.toLocaleString()}{' '}
-              <span className="text-xs font-sans font-normal text-stone-500">
-                {storeSettings.currency}
-              </span>
-            </div>
-            <div className="text-[10px] text-stone-400 mt-0.5">
-              من {salesCount} عملية بيع
-            </div>
-          </div>
-        </div>
-
-        {/* 2. Sales Returns / Refunds */}
-        <div className="bg-white p-3.5 rounded-2xl border border-stone-200 bg-stone-50/50 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-stone-600">2. مردود المبيعات (-):</span>
-            <div className="w-7 h-7 rounded-lg bg-stone-200 text-stone-800 flex items-center justify-center">
-              <RotateCcw className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-xl sm:text-2xl font-mono font-black text-rose-700">
-              -{salesReturnsTotal.toLocaleString()}{' '}
-              <span className="text-xs font-sans font-normal text-stone-600">
-                {storeSettings.currency}
-              </span>
-            </div>
-            <div className="text-[10px] text-stone-500 mt-0.5">
-              من {returnsCount} سند مردود مبيعات
-            </div>
-          </div>
-        </div>
-
-        {/* 3. Total Collected Deposits */}
-        <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50/30 to-white shadow-xs hover:border-emerald-400 transition-all flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-800">3. مقبوضات العربون:</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
-              <ArrowDownLeft className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-xl sm:text-2xl font-mono font-black text-emerald-700">
-              +{collectedDeposits.toLocaleString()}{' '}
-              <span className="text-xs font-sans font-normal text-emerald-900">
-                {storeSettings.currency}
-              </span>
-            </div>
-            <div className="text-[10px] text-emerald-700 mt-0.5">
-              مفصلة من عربون وحجوزات الكيك
-            </div>
-          </div>
-        </div>
-
-        {/* 4. Total Daily Expenses */}
-        <div className="bg-white p-3.5 rounded-2xl border border-rose-200 bg-gradient-to-b from-rose-50/30 to-white shadow-xs hover:border-rose-400 transition-all flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-800">4. صرفيات اليومية:</span>
-            <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-800 flex items-center justify-center">
-              <Receipt className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-xl sm:text-2xl font-mono font-black text-rose-700">
-              -{dailyExpenses.toLocaleString()}{' '}
-              <span className="text-xs font-sans font-normal text-rose-900">
-                {storeSettings.currency}
-              </span>
-            </div>
-            <div className="text-[10px] text-rose-700 mt-0.5">
-              من {expensesCount} سند صرف مسجل
-            </div>
-          </div>
-        </div>
-
-        {/* 5. Net Cash in Drawer */}
-        <div className="bg-brand-900 text-white p-3.5 rounded-2xl shadow-md border-2 border-gold-500/50 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gold-300">5. صافي النقد بالصندوق:</span>
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl sm:text-3xl font-mono font-black text-white">
-              {netCash.toLocaleString()}{' '}
-              <span className="text-xs font-sans font-normal text-gold-300">
-                {storeSettings.currency}
-              </span>
-            </div>
-            <div className="text-[10px] text-warm-200 mt-0.5 font-mono">
-              = (المبيعات - المردود + العربون) - الصرفيات
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Segregated Delivery Fees Banner (عزل أجور التوصيل) */}
-      <div className="px-3 sm:px-4 pb-3">
-        <div className="bg-amber-50/90 border border-amber-300 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2 text-amber-950 font-bold">
-            <Truck className="w-4 h-4 text-amber-700 shrink-0" />
-            <span>أجور توصيل الطلبيات (للسائقين - معزولة عن الصندوق):</span>
-            <span className="font-mono text-base font-black text-amber-900">
-              {Number(totalDeliveryFees || 0).toLocaleString()} {storeSettings.currency}
-            </span>
-          </div>
-          <div className="text-[11px] text-amber-800">
-            * مبالغ التوصيل تُسلّم للسائقين مباشرة ولا تدخل في إيرادات المحل ولا تؤثر على صافي نقدية الصندوق.
-          </div>
-        </div>
-      </div>
-
       {/* Internal Navigation Subtabs */}
-      <div className="px-3 sm:px-4 bg-white border-b border-warm-200/80 flex items-center gap-2 overflow-x-auto">
+      <div className="px-3 sm:px-4 bg-white border-b border-warm-200/80 flex items-center gap-2 overflow-x-auto shrink-0">
         {[
           { id: 'summary', label: 'معادلة الميزانية والخلاصة' },
           { id: 'today_sales', label: `فواتير المبيعات (${salesCount})` },
@@ -430,8 +296,168 @@ export function TreasuryModule() {
         })}
       </div>
 
-      {/* Subtab Content Area */}
-      <div className="flex-1 p-3 sm:p-4 overflow-y-auto">
+      {/* Main Tab Content Area - Full-Page Natural Scroll */}
+      <div className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-4">
+        {/* Success Notification Notice */}
+        {successNotice && (
+          <div className="p-3.5 bg-emerald-50 border-2 border-emerald-400 text-emerald-950 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold animate-fade-in shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle className="w-5 h-5 text-emerald-700 shrink-0" />
+              <span>{successNotice}</span>
+            </div>
+            <button
+              onClick={() => setSuccessNotice('')}
+              className="text-emerald-800 hover:text-emerald-950 px-2 py-1 bg-emerald-100 rounded-lg text-xs font-bold cursor-pointer"
+            >
+              إغلاق الإشعار
+            </button>
+          </div>
+        )}
+
+        {/* Dynamic Financial KPI Cards & Fee Notices (Active shift overview) */}
+        {activeTab !== 'past_zreports' && (
+          <>
+            {/* Dynamic Financial KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {/* 1. Total Direct Sales Revenue */}
+              <div className="bg-white p-3.5 rounded-2xl border border-warm-200 shadow-xs hover:border-brand-700/30 transition-all flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-stone-500">1. المبيعات المباشرة:</span>
+                  <div className="w-7 h-7 rounded-lg bg-brand-50 text-brand-800 flex items-center justify-center">
+                    <ArrowUpRight className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <div className="text-xl sm:text-2xl font-mono font-black text-brand-900">
+                    {directSales.toLocaleString()}{' '}
+                    <span className="text-xs font-sans font-normal text-stone-500">
+                      {storeSettings.currency}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-stone-400 mt-0.5">
+                    من {salesCount} عملية بيع
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Sales Returns / Refunds */}
+              <div className="bg-white p-3.5 rounded-2xl border border-stone-200 bg-stone-50/50 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-stone-600">2. مردود المبيعات (-):</span>
+                  <div className="w-7 h-7 rounded-lg bg-stone-200 text-stone-800 flex items-center justify-center">
+                    <RotateCcw className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <div className="text-xl sm:text-2xl font-mono font-black text-rose-700">
+                    -{salesReturnsTotal.toLocaleString()}{' '}
+                    <span className="text-xs font-sans font-normal text-stone-600">
+                      {storeSettings.currency}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-stone-500 mt-0.5">
+                    من {returnsCount} سند مردود مبيعات
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Total Collected Deposits */}
+              <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50/30 to-white shadow-xs hover:border-emerald-400 transition-all flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-800">3. مقبوضات العربون:</span>
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                    <ArrowDownLeft className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <div className="text-xl sm:text-2xl font-mono font-black text-emerald-700">
+                    +{collectedDeposits.toLocaleString()}{' '}
+                    <span className="text-xs font-sans font-normal text-emerald-900">
+                      {storeSettings.currency}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-emerald-700 mt-0.5">
+                    مفصلة من عربون وحجوزات الكيك
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Total Daily Expenses */}
+              <div className="bg-white p-3.5 rounded-2xl border border-rose-200 bg-gradient-to-b from-rose-50/30 to-white shadow-xs hover:border-rose-400 transition-all flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-rose-800">4. صرفيات اليومية:</span>
+                  <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-800 flex items-center justify-center">
+                    <Receipt className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <div className="text-xl sm:text-2xl font-mono font-black text-rose-700">
+                    -{dailyExpenses.toLocaleString()}{' '}
+                    <span className="text-xs font-sans font-normal text-rose-900">
+                      {storeSettings.currency}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-rose-700 mt-0.5">
+                    من {expensesCount} سند صرف مسجل
+                  </div>
+                </div>
+              </div>
+
+              {/* 5. Net Cash in Drawer */}
+              <div className="bg-brand-900 text-white p-3.5 rounded-2xl shadow-md border-2 border-gold-500/50 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gold-300">5. صافي النقد بالصندوق:</span>
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                </div>
+                <div className="mt-2">
+                  <div className="text-2xl sm:text-3xl font-mono font-black text-white">
+                    {netCash.toLocaleString()}{' '}
+                    <span className="text-xs font-sans font-normal text-gold-300">
+                      {storeSettings.currency}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-warm-200 mt-0.5 font-mono">
+                    = (المبيعات - المردود + العربون) - الصرفيات
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Segregated Delivery Fees Banner (عزل أجور التوصيل) */}
+            <div>
+              <div className="bg-amber-50/90 border border-amber-300 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 text-amber-950 font-bold">
+                  <Truck className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>أجور توصيل الطلبيات (للسائقين - معزولة عن الصندوق):</span>
+                  <span className="font-mono text-base font-black text-amber-900">
+                    {Number(totalDeliveryFees || 0).toLocaleString()} {storeSettings.currency}
+                  </span>
+                </div>
+                <div className="text-[11px] text-amber-800">
+                  * مبالغ التوصيل تُسلّم للسائقين مباشرة ولا تدخل في إيرادات المحل ولا تؤثر على صافي نقدية الصندوق.
+                </div>
+              </div>
+            </div>
+
+            {/* Segregated Electronic Payments Banner (عزل مقبوضات الدفع الإلكتروني والبطاقات عن كاش الصندوق - للمدير فقط) */}
+            {isManager && (
+              <div>
+                <div className="bg-blue-50/90 border border-blue-300 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-blue-950 font-bold">
+                    <CreditCard className="w-4 h-4 text-blue-700 shrink-0" />
+                    <span>مقبوضات الدفع الإلكتروني / البطاقات (معزولة عن كاش الصندوق):</span>
+                    <span className="font-mono text-base font-black text-blue-900">
+                      {Number(electronicPaymentsTotal || 0).toLocaleString()} {storeSettings.currency}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-blue-800">
+                    * مبالغ البطاقات (Qi / Master) معزولة بالكامل ولا تدخل في كاش الدرج الفعلي (صافي النقد).
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
         {/* TAB 1: Summary & Formula breakdown */}
         {activeTab === 'summary' && (
           <div className="space-y-4 max-w-4xl mx-auto">
@@ -457,7 +483,7 @@ export function TreasuryModule() {
                   <span className={`px-2.5 py-1 rounded-lg font-black text-xs ${
                     activeShiftType === 'صباحي' ? 'bg-amber-100 text-amber-950 border border-amber-300' : 'bg-indigo-100 text-indigo-950 border border-indigo-300'
                   }`}>
-                    {activeShiftType === 'صباحي' ? '☀️ الشفت الصباحي' : '🌙 الشفت المسائي'}
+                    {activeShiftType === 'صباحي' ? 'الشفت الصباحي' : 'الشفت المسائي'}
                   </span>
                 </div>
               </div>
@@ -471,7 +497,7 @@ export function TreasuryModule() {
                         <Sun className="w-4 h-4 text-amber-800" />
                       </div>
                       <div>
-                        <div className="font-black text-stone-900 text-sm">الشفت الصباحي ☀️</div>
+                        <div className="font-black text-stone-900 text-sm">الشفت الصباحي</div>
                         <div className="text-[10px] text-stone-500 font-bold">
                           المسؤول: {dailyTreasury.morningMetrics?.cashierName || 'كاشير الصباح'}
                         </div>
@@ -522,7 +548,7 @@ export function TreasuryModule() {
                         <Moon className="w-4 h-4 text-indigo-800" />
                       </div>
                       <div>
-                        <div className="font-black text-stone-900 text-sm">الشفت المسائي 🌙</div>
+                        <div className="font-black text-stone-900 text-sm">الشفت المسائي</div>
                         <div className="text-[10px] text-stone-500 font-bold">
                           المسؤول: {dailyTreasury.eveningMetrics?.cashierName || 'كاشير المساء'}
                         </div>
@@ -627,18 +653,18 @@ export function TreasuryModule() {
 
         {/* TAB 2: Today's Sales Invoices */}
         {activeTab === 'today_sales' && (
-          <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-xs">
+          <div className="bg-white rounded-2xl border border-warm-200 shadow-xs">
             <table className="w-full text-right text-xs">
-              <thead className="bg-warm-100 font-bold text-stone-700 border-b border-warm-200">
+              <thead className="bg-warm-100 font-bold text-stone-700 border-b border-warm-200 sticky top-0 z-10 shadow-xs">
                 <tr>
-                  <th className="py-2.5 px-3">رقم الفاتورة</th>
-                  <th className="py-2.5 px-3">الوقت</th>
-                  <th className="py-2.5 px-3">الشفت</th>
-                  <th className="py-2.5 px-3">الزبون</th>
-                  <th className="py-2.5 px-3">طريقة الدفع</th>
-                  <th className="py-2.5 px-3">الأصناف</th>
-                  <th className="py-2.5 px-3">الصافي</th>
-                  <th className="py-2.5 px-3 text-center">طباعة</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10 first:rounded-tr-2xl">رقم الفاتورة</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">الوقت</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">الشفت</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">الزبون</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">طريقة الدفع</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">الأصناف</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">الصافي</th>
+                  <th className="py-2.5 px-3 text-center sticky top-0 bg-warm-100 z-10 last:rounded-tl-2xl">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-warm-100">
@@ -649,47 +675,88 @@ export function TreasuryModule() {
                     </td>
                   </tr>
                 ) : (
-                  sessionSales.map((sale) => (
-                    <tr key={sale.id} className="hover:bg-warm-50/60">
-                      <td className="py-2.5 px-3 font-mono font-bold text-brand-900">
-                        {sale.receiptNo}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-stone-500">
-                        {new Date(sale.date).toLocaleTimeString('ar-IQ', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black inline-flex items-center gap-1 ${
-                          sale.shiftType === 'مسائي'
-                            ? 'bg-indigo-100 text-indigo-900 border border-indigo-200'
-                            : 'bg-amber-100 text-amber-900 border border-amber-200'
-                        }`}>
-                          {sale.shiftType === 'مسائي' ? '🌙 مسائي' : '☀️ صباحي'}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 font-semibold text-stone-800">
-                        {sale.customerName}
-                      </td>
-                      <td className="py-2.5 px-3 text-stone-600">{sale.paymentMethod}</td>
-                      <td className="py-2.5 px-3 text-stone-500 text-[11px]">
-                        {sale.items.map((i) => `${i.product.name} (×${i.quantity})`).join('، ')}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono font-black text-brand-900 text-sm">
-                        {sale.netTotal.toLocaleString()} {storeSettings.currency}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <button
-                          onClick={() => triggerPrint('sale', sale)}
-                          title="إعادة طباعة الفاتورة"
-                          className="p-1.5 hover:bg-brand-50 text-stone-600 hover:text-brand-800 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <Printer className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  sessionSales.map((sale) => {
+                    const isCard =
+                      String(sale.paymentMethod).includes('بطاقة') ||
+                      String(sale.paymentMethod).includes('إلكتروني') ||
+                      String(sale.paymentMethod).includes('card') ||
+                      String(sale.paymentMethod).includes('qi');
+
+                    return (
+                      <tr key={sale.id} className="hover:bg-warm-50/60">
+                        <td className="py-2.5 px-3 font-mono font-bold text-brand-900">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{sale.receiptNo}</span>
+                            {sale.editedBy && (
+                              <span
+                                title={`تم تعديل الفاتورة بواسطة المدير: ${sale.editNote || ''}`}
+                                className="bg-blue-100 text-blue-800 border border-blue-200 text-[9px] px-1.5 py-0.2 rounded font-sans font-bold"
+                              >
+                                مُعدّلة
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-stone-500">
+                          {new Date(sale.date).toLocaleTimeString('ar-IQ', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black inline-flex items-center gap-1 ${
+                              sale.shiftType === 'مسائي'
+                                ? 'bg-indigo-100 text-indigo-900 border border-indigo-200'
+                                : 'bg-amber-100 text-amber-900 border border-amber-200'
+                            }`}
+                          >
+                            {sale.shiftType === 'مسائي' ? 'مسائي' : 'صباحي'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-semibold text-stone-800">
+                          {sale.customerName}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-md font-bold text-[11px] inline-flex items-center gap-1 ${
+                              isCard
+                                ? 'bg-blue-100 text-blue-900 border border-blue-200'
+                                : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                            }`}
+                          >
+                            {isCard ? 'بطاقة 💳' : 'نقداً 💵'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-stone-500 text-[11px]">
+                          {sale.items.map((i) => `${i.product.name} (×${i.quantity})`).join('، ')}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-black text-brand-900 text-sm">
+                          {sale.netTotal.toLocaleString()} {storeSettings.currency}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {isManager && (
+                              <button
+                                onClick={() => openEditSaleModal(sale)}
+                                title="تعديل الفاتورة / طريقة الدفع (صلاحية المدير العام)"
+                                className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-900 border border-blue-200 rounded-lg transition-all cursor-pointer shadow-2xs"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => triggerPrint('sale', sale)}
+                              title="إعادة طباعة الفاتورة"
+                              className="p-1.5 hover:bg-brand-50 text-stone-600 hover:text-brand-800 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Printer className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -698,17 +765,17 @@ export function TreasuryModule() {
 
         {/* TAB 3: Today's Returns */}
         {activeTab === 'today_returns' && (
-          <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-xs">
+          <div className="bg-white rounded-2xl border border-warm-200 shadow-xs">
             <table className="w-full text-right text-xs">
-              <thead className="bg-warm-100 font-bold text-stone-700 border-b border-warm-200">
+              <thead className="bg-warm-100 font-bold text-stone-700 border-b border-warm-200 sticky top-0 z-10 shadow-xs">
                 <tr>
-                  <th className="py-2.5 px-3">رقم سند المردود</th>
-                  <th className="py-2.5 px-3">الوقت</th>
-                  <th className="py-2.5 px-3">الشفت</th>
-                  <th className="py-2.5 px-3">المبلغ المسترجع</th>
-                  <th className="py-2.5 px-3">الزبون</th>
-                  <th className="py-2.5 px-3">السبب</th>
-                  <th className="py-2.5 px-3 text-center">طباعة الوصل</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10 first:rounded-tr-2xl">رقم سند المردود</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">الوقت</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">الشفت</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">المبلغ المسترجع</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">الزبون</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">السبب</th>
+                  <th className="py-2.5 px-3 text-center sticky top-0 bg-warm-100 z-10 last:rounded-tl-2xl">طباعة الوصل</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-warm-100">
@@ -736,7 +803,7 @@ export function TreasuryModule() {
                             ? 'bg-indigo-100 text-indigo-900 border border-indigo-200'
                             : 'bg-amber-100 text-amber-900 border border-amber-200'
                         }`}>
-                          {ret.shiftType === 'مسائي' ? '🌙 مسائي' : '☀️ صباحي'}
+                          {ret.shiftType === 'مسائي' ? 'مسائي' : 'صباحي'}
                         </span>
                       </td>
                       <td className="py-2.5 px-3 font-mono font-black text-rose-700 text-sm">
@@ -765,17 +832,17 @@ export function TreasuryModule() {
 
         {/* TAB 4: Today's Expenses */}
         {activeTab === 'today_expenses' && (
-          <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-xs">
+          <div className="bg-white rounded-2xl border border-warm-200 shadow-xs">
             <table className="w-full text-right text-xs">
-              <thead className="bg-warm-100 font-bold text-stone-700 border-b border-warm-200">
+              <thead className="bg-warm-100 font-bold text-stone-700 border-b border-warm-200 sticky top-0 z-10 shadow-xs">
                 <tr>
-                  <th className="py-2.5 px-3">رقم السند</th>
-                  <th className="py-2.5 px-3">الوقت</th>
-                  <th className="py-2.5 px-3">الشفت</th>
-                  <th className="py-2.5 px-3">المبلغ</th>
-                  <th className="py-2.5 px-3">التصنيف</th>
-                  <th className="py-2.5 px-3">البيان</th>
-                  <th className="py-2.5 px-3 text-center">الإجراءات</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10 first:rounded-tr-2xl">رقم السند</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">الوقت</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">الشفت</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">المبلغ</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">التصنيف</th>
+                  <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">البيان</th>
+                  <th className="py-2.5 px-3 text-center sticky top-0 bg-warm-100 z-10 last:rounded-tl-2xl">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-warm-100">
@@ -803,7 +870,7 @@ export function TreasuryModule() {
                             ? 'bg-indigo-100 text-indigo-900 border border-indigo-200'
                             : 'bg-amber-100 text-amber-900 border border-amber-200'
                         }`}>
-                          {exp.shiftType === 'مسائي' ? '🌙 مسائي' : '☀️ صباحي'}
+                          {exp.shiftType === 'مسائي' ? 'مسائي' : 'صباحي'}
                         </span>
                       </td>
                       <td className="py-2.5 px-3 font-mono font-black text-rose-700 text-sm">
@@ -985,19 +1052,19 @@ export function TreasuryModule() {
             </div>
 
             {/* Shifts Archive Table */}
-            <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden shadow-xs">
+            <div className="bg-white rounded-2xl border border-warm-200 shadow-xs">
               <table className="w-full text-right text-xs">
-                <thead className="bg-warm-100 font-bold text-stone-700 border-b border-warm-200">
+                <thead className="bg-warm-100 font-bold text-stone-700 border-b border-warm-200 sticky top-0 z-10 shadow-xs">
                   <tr>
-                    <th className="py-2.5 px-3">رقم الوردية / Z</th>
-                    <th className="py-2.5 px-3">وقت الإغلاق</th>
-                    <th className="py-2.5 px-3">المبيعات</th>
-                    <th className="py-2.5 px-3">المردود</th>
-                    <th className="py-2.5 px-3">العربون</th>
-                    <th className="py-2.5 px-3">الصرفيات</th>
-                    <th className="py-2.5 px-3">صافي الصندوق</th>
-                    <th className="py-2.5 px-3">المسؤول</th>
-                    <th className="py-2.5 px-3 text-center">الإجراءات / طباعة</th>
+                    <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10 first:rounded-tr-2xl">رقم الوردية / Z</th>
+                    <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">وقت الإغلاق</th>
+                    <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">المبيعات</th>
+                    <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">المردود</th>
+                    <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">العربون</th>
+                    <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">الصرفيات</th>
+                    <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">صافي الصندوق</th>
+                    <th className="py-2.5 px-3 sticky top-0 bg-warm-100 z-10">المسؤول</th>
+                    <th className="py-2.5 px-3 text-center sticky top-0 bg-warm-100 z-10 last:rounded-tl-2xl">الإجراءات / طباعة</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-warm-100">

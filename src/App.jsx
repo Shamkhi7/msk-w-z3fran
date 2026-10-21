@@ -11,8 +11,10 @@ import { ReservationsModule } from './components/reservations/ReservationsModule
 import { ExpensesModule } from './components/expenses/ExpensesModule';
 import { TreasuryModule } from './components/treasury/TreasuryModule';
 import { ProductReportsModule } from './components/reports/ProductReportsModule';
-import { StoreSettingsModal } from './components/settings/StoreSettingsModal';
+import { SettingsModule } from './components/settings/SettingsModule';
 import { PrintPreviewModal } from './components/print/PrintPreviewModal';
+import { EditSalePaymentModal } from './components/treasury/EditSalePaymentModal';
+import { SalesReceipt } from './components/print/SalesReceipt';
 import { SplashScreen } from './components/common/SplashScreen';
 
 function POSApp() {
@@ -25,18 +27,19 @@ function POSApp() {
     setToast,
     shiftNotice,
     setShiftNotice,
+    directPrintSale,
+    storeSettings,
   } = usePOS();
-  const [activeTab, setActiveTab] = useState('pos'); // 'pos' | 'reservations' | 'expenses' | 'reports' | 'treasury'
+  const [activeTab, setActiveTab] = useState('pos'); // 'pos' | 'reservations' | 'expenses' | 'reports' | 'treasury' | 'settings'
   const [isWelcomeDismissed, setIsWelcomeDismissed] = useState(false);
 
   // Modals
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Safeguard: Cashiers cannot remain on manager-only tabs
   useEffect(() => {
-    if (!isManager && activeTab === 'reports') {
+    if (!isManager && (activeTab === 'reports' || activeTab === 'settings')) {
       setActiveTab('pos');
     }
   }, [isManager, activeTab]);
@@ -63,7 +66,7 @@ function POSApp() {
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={() => setActiveTab('settings')}
         onOpenWelcome={() => setIsWelcomeDismissed(false)}
       />
 
@@ -121,6 +124,12 @@ function POSApp() {
             <TreasuryModule />
           </div>
         )}
+
+        {activeTab === 'settings' && isManager && (
+          <div className="flex-1 overflow-hidden">
+            <SettingsModule />
+          </div>
+        )}
       </main>
 
       {/* Modals & Dialogs */}
@@ -135,13 +144,18 @@ function POSApp() {
         defaultCategoryId={activeCategory}
       />
 
-      <StoreSettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
-
       {/* Dedicated Thermal Print Preview Modal & Print Mount Point */}
       <PrintPreviewModal />
+
+      {/* Manager-Only Sales Invoice Editing Modal */}
+      <EditSalePaymentModal />
+
+      {/* Native Direct Thermal Print Portal (For Buttons 1 & 2) */}
+      {directPrintSale && (
+        <div className="print-only pointer-events-none fixed -left-[9999px] top-0 print:static print:pointer-events-auto print:left-0 print:top-0 print:w-[72.1mm]">
+          <SalesReceipt sale={directPrintSale} storeSettings={storeSettings} />
+        </div>
+      )}
 
       {/* Subtle Crash Recovery & Prior Session Restoration Toast */}
       {sessionRestoredNotice && (

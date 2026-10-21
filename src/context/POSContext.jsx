@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect, useRef } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useAudioBeep } from '../hooks/useAudioBeep';
 import { requestPersistentStorage, initDesktopStorageSync } from '../utils/storagePersistence';
@@ -15,6 +15,7 @@ import {
   DEFAULT_CUSTOMERS,
 } from '../data/defaultData';
 import { getShiftByLocalTime, getReservationDueStatus } from '../utils/dateFormatter';
+import { isWeightedProduct, roundIQD, getCartItemLineTotal } from '../utils/productAnalyticsHelper';
 
 const POSContext = createContext(null);
 
@@ -375,16 +376,24 @@ export function POSProvider({ children }) {
   // Dedicated Shift Change Visual Alert State
   const [shiftNotice, setShiftNotice] = useState(null);
 
-  // Runtime Auto Shift Switching Timer (switches immediately even during active usage)
+  // Stable refs to prevent interval churn
+  const storeSettingsRef = useRef(storeSettings);
+  storeSettingsRef.current = storeSettings;
+  const activeShiftTypeRef = useRef(activeShiftType);
+  activeShiftTypeRef.current = activeShiftType;
+  const isSingleInvoiceShiftOverrideRef = useRef(isSingleInvoiceShiftOverride);
+  isSingleInvoiceShiftOverrideRef.current = isSingleInvoiceShiftOverride;
+
+  // Runtime Auto Shift Switching Timer (Stable, leak-proof single timer)
   useEffect(() => {
-    if (storeSettings.autoShiftSwitchEnabled === false) return;
-
     const checkAutoShift = () => {
-      // Do not override if cashier temporarily switched shift for a single invoice
-      if (isSingleInvoiceShiftOverride) return;
+      const currentSettings = storeSettingsRef.current;
+      if (currentSettings.autoShiftSwitchEnabled === false) return;
+      if (isSingleInvoiceShiftOverrideRef.current) return;
 
-      const expectedShift = getShiftByLocalTime(new Date(), storeSettings);
-      if (expectedShift !== activeShiftType) {
+      const expectedShift = getShiftByLocalTime(new Date(), currentSettings);
+      const currentShift = activeShiftTypeRef.current;
+      if (expectedShift !== currentShift) {
         // Immediate switch even during active usage!
         setActiveShiftType(expectedShift);
         playSound('success');
@@ -408,12 +417,11 @@ export function POSProvider({ children }) {
       }
     };
 
-    // Check periodically every 5 seconds for instant responsiveness
-    const interval = setInterval(checkAutoShift, 5000);
-    // Also run an immediate check on startup
+    // Check periodically every 10 seconds without resetting interval on every state update
+    const interval = setInterval(checkAutoShift, 10000);
     checkAutoShift();
     return () => clearInterval(interval);
-  }, [storeSettings, activeShiftType, isSingleInvoiceShiftOverride]);
+  }, []);
 
   // 5. Thermal Printing State
   const [printJob, setPrintJob] = useState({
@@ -421,6 +429,7 @@ export function POSProvider({ children }) {
     type: null, // 'sale' | 'reservation' | 'expense' | 'combined_expenses' | 'sales_return' | 'zreport' | 'xreport'
     data: null,
   });
+  const [directPrintSale, setDirectPrintSale] = useState(null);
 
   // Sound helper
   const playSound = (type) => {
@@ -600,9 +609,15 @@ export function POSProvider({ children }) {
         customPrice !== null ? Number(customPrice) : Number(product.price);
 
       if (existingIndex > -1 && customPrice === null) {
+        const isWeighted = isWeightedProduct(product);
+        const step = isWeighted ? 0.25 : 1;
         return prevCart.map((item, idx) =>
           idx === existingIndex
-            ? { ...item, quantity: item.quantity + 1 }
+            ? {
+                ...item,
+                quantity: Math.round((item.quantity + step) * 1000) / 1000,
+                manualTotalAmount: null,
+              }
             : item
         );
       }
@@ -632,8 +647,35 @@ export function POSProvider({ children }) {
     const qty = Math.round(rawNum * 1000) / 1000;
     updateActiveCartItems((prev) =>
       prev.map((item) =>
-        item.cartItemId === cartItemId ? { ...item, quantity: qty } : item
+        item.cartItemId === cartItemId
+          ? { ...item, quantity: qty, manualTotalAmount: null }
+          : item
       )
+    );
+  };
+
+  // Bi-directional Price-to-Weight synchronizer: sets target amount and calculates deduced weight
+  // Strictly locks the subtotal to the typed integer amount without reverse circular recalculation
+  const setCartItemTotalAmount = (cartItemId, targetAmount) => {
+    const rawAmount = parseFloat(targetAmount);
+    if (isNaN(rawAmount) || rawAmount < 0) return;
+    const lockedAmount = Math.round(rawAmount);
+    updateActiveCartItems((prev) =>
+      prev.map((item) => {
+        if (item.cartItemId === cartItemId) {
+          const basePrice = Number(item.unitPrice || item.originalPrice || item.product?.price || 0);
+          if (basePrice <= 0) return item;
+          // Derived weight: targetAmount / basePrice (rounded cleanly to 3 decimals)
+          const targetNet = Math.max(0, lockedAmount + (Number(item.discount) || 0));
+          const calculatedWeight = Math.round((targetNet / basePrice) * 1000) / 1000;
+          return {
+            ...item,
+            quantity: Math.max(0.001, calculatedWeight),
+            manualTotalAmount: lockedAmount,
+          };
+        }
+        return item;
+      })
     );
   };
 
@@ -706,9 +748,24 @@ export function POSProvider({ children }) {
       const uPrice = Number(item.unitPrice || item.price || origPrice);
       const qty = Number(item.quantity) || 1;
       const disc = Number(item.discount) || 0;
+      const isWeighted = isWeightedProduct(item.product || item);
 
-      const lineOriginal = Math.round(origPrice * qty);
-      const lineEffective = Math.max(0, Math.round((uPrice * qty) - disc));
+      let lineOriginal;
+      let lineEffective;
+
+      if (isWeighted) {
+        if (item.manualTotalAmount !== undefined && item.manualTotalAmount !== null && !isNaN(item.manualTotalAmount)) {
+          lineOriginal = Math.round(Number(item.manualTotalAmount));
+          lineEffective = Math.max(0, lineOriginal - disc);
+        } else {
+          lineOriginal = roundIQD(origPrice * qty);
+          lineEffective = Math.max(0, roundIQD(uPrice * qty - disc));
+        }
+      } else {
+        lineOriginal = Math.round(origPrice * qty);
+        lineEffective = Math.max(0, Math.round((uPrice * qty) - disc));
+      }
+
       const lineDiscount = Math.max(0, lineOriginal - lineEffective);
 
       subtotal += lineOriginal;
@@ -751,7 +808,9 @@ export function POSProvider({ children }) {
       .filter((item) => item.product?.isDeposit || item.product?.id === 'service-deposit')
       .reduce((sum, item) => sum + Math.max(0, (Number(item.unitPrice || item.price || 0) * (Number(item.quantity) || 1)) - (Number(item.discount) || 0)), 0);
 
-    const itemsNet = Math.max(0, cartSummary.subtotal - cartSummary.totalDiscount);
+    const extraDiscount = Math.max(0, Number(paymentData.orderDiscount) || 0);
+    const effectiveTotalDiscount = cartSummary.totalDiscount + extraDiscount;
+    const itemsNet = Math.max(0, cartSummary.subtotal - effectiveTotalDiscount);
     // Direct shop sales amount EXCLUDES delivery fee!
     const directSalesAmount = Math.max(0, itemsNet - depositAmountInCart);
     const finalNetTotal = itemsNet + resolvedDeliveryFee;
@@ -762,7 +821,7 @@ export function POSProvider({ children }) {
       sessionId: currentSession.sessionId,
       items: [...cart],
       subtotal: cartSummary.subtotal,
-      totalDiscount: cartSummary.totalDiscount,
+      totalDiscount: effectiveTotalDiscount,
       itemsNet: itemsNet,
       deliveryFee: resolvedDeliveryFee,
       netTotal: finalNetTotal,
@@ -836,6 +895,100 @@ export function POSProvider({ children }) {
       triggerPrint('sale', newSale);
     }
     return newSale;
+  };
+
+  // ==========================================
+  // MANAGER SALES INVOICE EDITING & PAYMENT METHOD SWITCH
+  // ==========================================
+  const [saleToEdit, setSaleToEdit] = useState(null);
+
+  const openEditSaleModal = (sale) => {
+    if (!isManager) {
+      playSound('warning');
+      showToast('عذراً، تعديل فواتير المبيعات متاح للمدير العام فقط', 'error');
+      return;
+    }
+    setSaleToEdit(sale);
+  };
+
+  const closeEditSaleModal = () => {
+    setSaleToEdit(null);
+  };
+
+  const updateSalePaymentMethod = (saleId, newPaymentMethod, editNote = '') => {
+    if (!isManager) {
+      playSound('warning');
+      showToast('عذراً، تعديل فواتير المبيعات متاح للمدير العام فقط', 'error');
+      return { success: false, message: 'صلاحية المدير العام مطلوبة' };
+    }
+
+    let updatedSale = null;
+
+    setSalesHistory((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      const idx = list.findIndex((s) => s.id === saleId);
+      if (idx === -1) return list;
+
+      const currentSale = list[idx];
+      const oldMethod = currentSale.paymentMethod || 'نقداً';
+
+      const isNewElectronic =
+        String(newPaymentMethod).includes('بطاقة') ||
+        String(newPaymentMethod).includes('إلكتروني') ||
+        String(newPaymentMethod).includes('card') ||
+        String(newPaymentMethod).includes('qi');
+
+      const auditEntry = {
+        id: 'AUD-' + Date.now(),
+        action: 'UPDATE_PAYMENT_METHOD',
+        from: oldMethod,
+        to: newPaymentMethod,
+        by: 'المدير العام',
+        note: editNote.trim() || 'تصحيح خطأ إدخال كاشير',
+        timestamp: new Date().toISOString(),
+      };
+
+      updatedSale = {
+        ...currentSale,
+        paymentMethod: newPaymentMethod,
+        previousMethod: oldMethod,
+        previousPaymentMethod: oldMethod,
+        amountReceived: isNewElectronic ? currentSale.netTotal : (currentSale.amountReceived || currentSale.netTotal),
+        changeDue: isNewElectronic ? 0 : (currentSale.changeDue || 0),
+        editedBy: 'manager',
+        editNote: editNote.trim() || 'تصحيح خطأ إدخال كاشير',
+        updatedAt: new Date().toISOString(),
+        editedAt: new Date().toISOString(),
+        auditLog: [...(currentSale.auditLog || []), auditEntry],
+      };
+
+      const newList = [...list];
+      newList[idx] = updatedSale;
+      return newList;
+    });
+
+    if (updatedSale) {
+      // If print preview modal is currently displaying this sale, update it dynamically in place
+      setPrintJob((prevJob) => {
+        if (prevJob.isOpen && prevJob.type === 'sale' && prevJob.data?.id === saleId) {
+          return {
+            ...prevJob,
+            data: updatedSale,
+          };
+        }
+        return prevJob;
+      });
+
+      playSound('success');
+      showToast(
+        `تم تعديل طريقة دفع الفاتورة (${updatedSale.receiptNo}) بنجاح وتحديث قيود الخزينة فوراً`,
+        'success'
+      );
+      closeEditSaleModal();
+      return { success: true, sale: updatedSale };
+    }
+
+    return { success: false, message: 'الفاتورة غير موجودة' };
   };
 
   // ==========================================
@@ -917,6 +1070,14 @@ export function POSProvider({ children }) {
       totalPieces: hasSlices ? (reservationData.totalPieces || 0) : 0,
       slicesTotal: hasSlices ? (reservationData.slicesTotal || 0) : 0,
       slicesFlavor: hasSlices ? (reservationData.slicesFlavor || '') : '',
+      // Delivery Information
+      isDelivery: Boolean(reservationData.isDelivery),
+      deliveryAddress: reservationData.deliveryAddress || '',
+      deliveryPhone: reservationData.deliveryPhone || '',
+      deliveryNotes: reservationData.deliveryNotes || '',
+      deliveryFee: Number(reservationData.deliveryFee) || 0,
+      // Deposit Payment Method
+      depositPaymentMethod: reservationData.depositPaymentMethod || 'نقداً',
       // Consolidated Financials
       totalCost: total,
       depositPaid: deposit,
@@ -973,13 +1134,13 @@ export function POSProvider({ children }) {
         directSalesAmount: 0,
         amountReceived: deposit,
         changeDue: 0,
-        paymentMethod: 'نقداً',
+        paymentMethod: reservationData.depositPaymentMethod || 'نقداً',
         customerName: reservationData.customerName,
         cashierName: activeCashier || storeSettings.cashierName,
         shiftType: activeShiftType || 'صباحي',
         date: new Date().toISOString(),
         reservationId: newReservation.id,
-        notes: `عربون حجز رقم ${receiptNumber}`,
+        notes: `عربون حجز رقم ${receiptNumber} (${reservationData.depositPaymentMethod || 'نقداً'})`,
       };
       setSalesHistory((prev) => [depositSale, ...prev]);
     }
@@ -1009,7 +1170,7 @@ export function POSProvider({ children }) {
     );
   };
 
-  const deliverReservationAndCollectBalance = (reservation) => {
+  const deliverReservationAndCollectBalance = (reservation, remainingPaymentMethod = 'نقداً') => {
     if (reservation.remainingBalance > 0) {
       const hasMold = reservation.hasMold !== false && (reservation.cakeSize || reservation.hasMold);
       const hasSlices =
@@ -1059,13 +1220,13 @@ export function POSProvider({ children }) {
         directSalesAmount: reservation.remainingBalance,
         amountReceived: reservation.remainingBalance,
         changeDue: 0,
-        paymentMethod: 'نقداً',
+        paymentMethod: remainingPaymentMethod || 'نقداً',
         customerName: reservation.customerName,
         cashierName: activeCashier || storeSettings.cashierName,
         shiftType: activeShiftType || 'صباحي',
         date: new Date().toISOString(),
         reservationId: reservation.id,
-        notes: `تسليم طلب كيك واستلام المتبقي للحجز ${reservation.receiptNumber}`,
+        notes: `تسليم طلب كيك واستلام المتبقي للحجز ${reservation.receiptNumber} (${remainingPaymentMethod || 'نقداً'})`,
       };
       setSalesHistory((prev) => [remainingSale, ...prev]);
       triggerPrint('sale', remainingSale);
@@ -1074,7 +1235,13 @@ export function POSProvider({ children }) {
     setReservations((prev) =>
       prev.map((r) =>
         r.id === reservation.id
-          ? { ...r, status: 'تم التسليم', depositPaid: r.totalCost, remainingBalance: 0 }
+          ? {
+              ...r,
+              status: 'تم التسليم',
+              depositPaid: r.totalCost,
+              remainingBalance: 0,
+              remainingPaymentMethod,
+            }
           : r
       )
     );
@@ -1133,6 +1300,14 @@ export function POSProvider({ children }) {
       totalPieces: hasSlices ? (updatedData.totalPieces || 0) : 0,
       slicesTotal: hasSlices ? (updatedData.slicesTotal || 0) : 0,
       slicesFlavor: hasSlices ? (updatedData.slicesFlavor || '') : '',
+      // Delivery Information
+      isDelivery: updatedData.isDelivery !== undefined ? Boolean(updatedData.isDelivery) : Boolean(existing.isDelivery),
+      deliveryAddress: updatedData.deliveryAddress !== undefined ? updatedData.deliveryAddress : (existing.deliveryAddress || ''),
+      deliveryPhone: updatedData.deliveryPhone !== undefined ? updatedData.deliveryPhone : (existing.deliveryPhone || ''),
+      deliveryNotes: updatedData.deliveryNotes !== undefined ? updatedData.deliveryNotes : (existing.deliveryNotes || ''),
+      deliveryFee: updatedData.deliveryFee !== undefined ? Number(updatedData.deliveryFee) : (existing.deliveryFee || 0),
+      // Deposit Payment Method
+      depositPaymentMethod: updatedData.depositPaymentMethod || existing.depositPaymentMethod || 'نقداً',
       // Consolidated Financials
       totalCost: total,
       depositPaid: deposit,
@@ -1159,11 +1334,12 @@ export function POSProvider({ children }) {
                 return {
                   ...s,
                   customerName: updatedReservation.customerName,
+                  paymentMethod: updatedReservation.depositPaymentMethod,
                   subtotal: deposit,
                   netTotal: deposit,
                   depositAmount: deposit,
                   amountReceived: deposit,
-                  notes: `عربون حجز رقم ${existing.receiptNumber}`,
+                  notes: `عربون حجز رقم ${existing.receiptNumber} (${updatedReservation.depositPaymentMethod})`,
                   items: (s.items || []).map((it) => ({
                     ...it,
                     product: {
@@ -1197,7 +1373,7 @@ export function POSProvider({ children }) {
                 unitPrice: deposit,
                 discount: 0,
                 isOverridden: true,
-              },
+              }
             ],
             subtotal: deposit,
             totalDiscount: 0,
@@ -1206,13 +1382,13 @@ export function POSProvider({ children }) {
             directSalesAmount: 0,
             amountReceived: deposit,
             changeDue: 0,
-            paymentMethod: 'نقداً',
+            paymentMethod: updatedReservation.depositPaymentMethod || 'نقداً',
             customerName: updatedReservation.customerName,
             cashierName: activeCashier || storeSettings.cashierName,
             shiftType: activeShiftType || 'صباحي',
             date: new Date().toISOString(),
             reservationId: existing.id,
-            notes: `عربون حجز رقم ${existing.receiptNumber}`,
+            notes: `عربون حجز رقم ${existing.receiptNumber} (${updatedReservation.depositPaymentMethod || 'نقداً'})`,
           };
           setSalesHistory((prev) => [depositSale, ...prev]);
         }
@@ -1537,9 +1713,35 @@ export function POSProvider({ children }) {
       (sum, e) => sum + Number(e.amount),
       0
     );
-    // Net cash in drawer is strictly: (Products Direct Sales - Returns + Deposits) - Expenses
-    // Delivery fees are completely segregated from shop cash!
-    const netCash = (directSales - salesReturnsTotal + collectedDeposits) - dailyExpenses;
+    // Electronic payments (Cards / Qi / Master) segregated from cash drawer
+    const isElectronic = (m) => {
+      if (!m) return false;
+      const s = String(m).toLowerCase();
+      return s.includes('بطاقة') || s.includes('إلكتروني') || s.includes('card') || s.includes('qi') || s.includes('master') || s.includes('شبكة');
+    };
+
+    const electronicDirectSales = (salesList || [])
+      .filter((s) => isElectronic(s.paymentMethod))
+      .reduce((sum, s) => sum + (s.directSalesAmount !== undefined ? s.directSalesAmount : Math.max(0, (s.netTotal || 0) - (s.deliveryFee || 0))), 0);
+
+    const electronicDeposits = (salesList || [])
+      .filter((s) => isElectronic(s.paymentMethod))
+      .reduce((sum, s) => sum + (s.depositAmount || 0), 0);
+
+    const electronicPaymentsTotal = electronicDirectSales + electronicDeposits;
+
+    // Cash amounts specifically received in physical cash (excluding cards and credit/receivables)
+    const cashDirectSales = (salesList || [])
+      .filter((s) => !isElectronic(s.paymentMethod) && s.paymentMethod !== 'آجل / ذمم')
+      .reduce((sum, s) => sum + (s.directSalesAmount !== undefined ? s.directSalesAmount : Math.max(0, (s.netTotal || 0) - (s.deliveryFee || 0))), 0);
+
+    const cashDeposits = (salesList || [])
+      .filter((s) => !isElectronic(s.paymentMethod) && s.paymentMethod !== 'آجل / ذمم')
+      .reduce((sum, s) => sum + (s.depositAmount || 0), 0);
+
+    // Net physical cash in drawer is strictly: (Cash Direct Sales - Cash Returns + Cash Deposits) - Daily Expenses
+    // Electronic payments and delivery fees are completely segregated from drawer cash!
+    const netCash = (cashDirectSales - salesReturnsTotal + cashDeposits) - dailyExpenses;
 
     const cashierName =
       salesList?.[0]?.cashierName ||
@@ -1555,6 +1757,11 @@ export function POSProvider({ children }) {
       netDirectSales,
       collectedDeposits,
       dailyExpenses,
+      electronicDirectSales,
+      electronicDeposits,
+      electronicPaymentsTotal,
+      cashDirectSales,
+      cashDeposits,
       netCash,
       salesCount: (salesList || []).length,
       expensesCount: (expensesList || []).length,
@@ -1634,6 +1841,7 @@ export function POSProvider({ children }) {
     const itemized = getItemizedSales(dailyTreasury.sessionSales);
     const xReportData = {
       cashierName: activeCashier || storeSettings.cashierName,
+      isManager: isManager,
       sessionId: currentSession.sessionId,
       openedAt: currentSession.openedAt,
       currentTime: new Date().toISOString(),
@@ -1642,6 +1850,7 @@ export function POSProvider({ children }) {
       salesReturns: dailyTreasury.salesReturnsTotal,
       collectedDeposits: dailyTreasury.collectedDeposits,
       dailyExpenses: dailyTreasury.dailyExpenses,
+      electronicPaymentsTotal: dailyTreasury.electronicPaymentsTotal || 0,
       netCash: dailyTreasury.netCash,
       salesCount: dailyTreasury.salesCount,
       expensesCount: dailyTreasury.expensesCount,
@@ -1669,6 +1878,7 @@ export function POSProvider({ children }) {
       netDirectSales: metrics.netDirectSales,
       collectedDeposits: metrics.collectedDeposits,
       dailyExpenses: metrics.dailyExpenses,
+      electronicPaymentsTotal: metrics.electronicPaymentsTotal || 0,
       netCash: metrics.netCash,
       salesCount: metrics.salesCount,
       expensesCount: metrics.expensesCount,
@@ -1693,6 +1903,7 @@ export function POSProvider({ children }) {
       salesReturns: shift.salesReturns,
       collectedDeposits: shift.collectedDeposits,
       dailyExpenses: shift.dailyExpenses,
+      electronicPaymentsTotal: shift.electronicPaymentsTotal || 0,
       netCash: shift.netCash,
       salesCount: shift.salesCount,
       expensesCount: shift.expensesCount,
@@ -1722,6 +1933,7 @@ export function POSProvider({ children }) {
       salesReturns: dailyTreasury.salesReturnsTotal,
       collectedDeposits: dailyTreasury.collectedDeposits,
       dailyExpenses: dailyTreasury.dailyExpenses,
+      electronicPaymentsTotal: dailyTreasury.electronicPaymentsTotal || 0,
       netCash: dailyTreasury.netCash,
       salesCount: dailyTreasury.salesCount,
       expensesCount: dailyTreasury.expensesCount,
@@ -1744,6 +1956,7 @@ export function POSProvider({ children }) {
       netDirectSales: dailyTreasury.netDirectSales,
       collectedDeposits: dailyTreasury.collectedDeposits,
       dailyExpenses: dailyTreasury.dailyExpenses,
+      electronicPaymentsTotal: dailyTreasury.electronicPaymentsTotal || 0,
       netCash: dailyTreasury.netCash,
       salesCount: dailyTreasury.salesCount,
       expensesCount: dailyTreasury.expensesCount,
@@ -1853,6 +2066,21 @@ export function POSProvider({ children }) {
       type: null,
       data: null,
     });
+  };
+
+  const directPrintReceipt = (sale) => {
+    if (!sale) return;
+    setDirectPrintSale(sale);
+    setTimeout(() => {
+      if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.printSilent === 'function') {
+        window.electronAPI.printSilent().finally(() => {
+          setTimeout(() => setDirectPrintSale(null), 600);
+        });
+      } else {
+        window.print();
+        setTimeout(() => setDirectPrintSale(null), 600);
+      }
+    }, 80);
   };
 
   // ==========================================
@@ -2043,6 +2271,7 @@ export function POSProvider({ children }) {
     cart,
     addToCart,
     updateItemQuantity,
+    setCartItemTotalAmount,
     removeFromCart,
     clearCart,
     setCartDeliveryFee,
@@ -2053,6 +2282,10 @@ export function POSProvider({ children }) {
     // Sales & Checkout
     completeSale,
     salesHistory,
+    saleToEdit,
+    openEditSaleModal,
+    closeEditSaleModal,
+    updateSalePaymentMethod,
 
     // Sales Returns
     salesReturns,
@@ -2112,6 +2345,9 @@ export function POSProvider({ children }) {
     printJob,
     triggerPrint,
     closePrintJob,
+    directPrintSale,
+    setDirectPrintSale,
+    directPrintReceipt,
 
     // Security PIN Management
     verifyManagerPin,

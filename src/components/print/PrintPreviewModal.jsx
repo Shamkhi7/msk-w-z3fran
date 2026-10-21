@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Printer, X } from 'lucide-react';
+import { Printer, X, Edit3 } from 'lucide-react';
 import { SalesReceipt } from './SalesReceipt';
 import { ReservationReceipt } from './ReservationReceipt';
 import { KitchenTicketReceipt } from './KitchenTicketReceipt';
@@ -10,10 +10,10 @@ import { ZReportReceipt } from './ZReportReceipt';
 import { XReportReceipt } from './XReportReceipt';
 import { ProductMovementReceipt } from './ProductMovementReceipt';
 import { ShiftHandoverReceipt } from './ShiftHandoverReceipt';
+import { ElectronicSalesReceipt } from './ElectronicSalesReceipt';
 import { usePOS } from '../../context/POSContext';
-
 export function PrintPreviewModal() {
-  const { printJob, closePrintJob, storeSettings } = usePOS();
+  const { printJob, closePrintJob, storeSettings, isManager, openEditSaleModal } = usePOS();
   const printAreaRef = useRef(null);
 
   if (!printJob.isOpen || !printJob.type) return null;
@@ -49,6 +49,8 @@ export function PrintPreviewModal() {
         return 'معاينة وصل تسليم الوردية (ملخص الشفت)';
       case 'product_movement':
         return 'معاينة تقرير حركة ومبيعات الأصناف (حراري 80mm)';
+      case 'electronic_sales':
+        return 'معاينة تقرير مبيعات الدفع الإلكتروني (حراري 80mm)';
       default:
         return 'معاينة الطباعة';
     }
@@ -67,7 +69,7 @@ export function PrintPreviewModal() {
           <>
             <ReservationReceipt reservation={printJob.data} storeSettings={storeSettings} />
             <div className="my-5 border-b-2 border-dashed border-black text-center text-[10px] font-black py-1 select-none">
-              ✂️ ----------------- قص الورق الحراري (بون المعمل) ----------------- ✂️
+              ----------------- قص الورق الحراري (بون المعمل) -----------------
             </div>
             <KitchenTicketReceipt reservation={printJob.data} storeSettings={storeSettings} />
           </>
@@ -97,6 +99,13 @@ export function PrintPreviewModal() {
       case 'product_movement':
         return (
           <ProductMovementReceipt
+            reportData={printJob.data}
+            storeSettings={storeSettings}
+          />
+        );
+      case 'electronic_sales':
+        return (
+          <ElectronicSalesReceipt
             reportData={printJob.data}
             storeSettings={storeSettings}
           />
@@ -159,17 +168,28 @@ export function PrintPreviewModal() {
           </div>
 
           {/* Footer Controls */}
-          <div className="p-4 bg-white border-t border-stone-200 flex items-center gap-3">
+          <div className="p-4 bg-white border-t border-stone-200 flex flex-wrap items-center gap-2.5">
+            {isManager && printJob.type === 'sale' && (
+              <button
+                type="button"
+                onClick={() => openEditSaleModal(printJob.data)}
+                title="تعديل الفاتورة / طريقة الدفع (صلاحية المدير العام)"
+                className="bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-900 border border-blue-300 font-bold py-2.5 px-3.5 rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer text-xs whitespace-nowrap shadow-2xs"
+              >
+                <Edit3 className="w-4 h-4 text-blue-600" />
+                <span>تعديل الفاتورة / طريقة الدفع</span>
+              </button>
+            )}
             <button
               onClick={handlePrint}
-              className="flex-1 bg-brand-800 hover:bg-brand-900 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
+              className="flex-1 bg-brand-800 hover:bg-brand-900 text-white font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer text-xs sm:text-sm"
             >
-              <Printer className="w-5 h-5 text-gold-400" />
+              <Printer className="w-4 h-4 text-gold-400" />
               <span>إرسال إلى الطابعة الحرارية</span>
             </button>
             <button
               onClick={closePrintJob}
-              className="bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium py-3 px-4 rounded-xl transition-colors text-sm cursor-pointer"
+              className="bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium py-2.5 px-3.5 rounded-xl transition-colors text-xs cursor-pointer"
             >
               إلغاء
             </button>

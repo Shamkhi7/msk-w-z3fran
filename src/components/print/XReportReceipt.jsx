@@ -1,9 +1,12 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
 import { ReceiptBrandingFooter } from './ReceiptBrandingFooter';
+import { getReceiptTypography } from '../../utils/receiptTypographyHelper';
 
 export function XReportReceipt({ reportData, storeSettings }) {
   if (!reportData) return null;
+
+  const typo = getReceiptTypography(storeSettings);
 
   const formatDate = (isoString) => {
     if (!isoString) return '-';
@@ -20,7 +23,7 @@ export function XReportReceipt({ reportData, storeSettings }) {
   const itemizedItems = reportData.itemizedItems || [];
 
   return (
-    <div className="receipt-container text-black bg-white select-none font-bold" style={{ color: '#000' }}>
+    <div className="receipt-container text-black bg-white select-none font-bold" style={typo.containerStyle}>
       {/* Header */}
       <div className="text-center pb-2 border-b-2 border-black">
         <div className="text-base font-black tracking-wide text-black">{storeSettings.storeNameAr}</div>
@@ -166,6 +169,19 @@ export function XReportReceipt({ reportData, storeSettings }) {
             </div>
             <div className="text-[8.5px] text-black">
               * مبالغ التوصيل تخص السائقين وتم عزلها بالكامل ولا تدخل ضمن صافي نقد القاصة أعلاه.
+            </div>
+          </div>
+        )}
+
+        {/* Isolated Electronic Payments (Not part of drawer cash) - Manager Only */}
+        {reportData.isManager && Number(reportData.electronicPaymentsTotal || 0) > 0 && (
+          <div className="p-1.5 border border-dashed border-black rounded text-[9.5px] bg-white space-y-0.5 mt-1">
+            <div className="flex justify-between font-black">
+              <span>مقبوضات إلكترونية / بطاقات (معزولة عن الصندوق):</span>
+              <span className="font-mono">{Number(reportData.electronicPaymentsTotal).toLocaleString()} {storeSettings.currency}</span>
+            </div>
+            <div className="text-[8.5px] text-black">
+              * مبالغ البطاقات الإلكترونية معزولة عن النقد الفعلي ولا تدخل ضمن صافي نقد القاصة أعلاه.
             </div>
           </div>
         )}

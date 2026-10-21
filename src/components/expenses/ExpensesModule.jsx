@@ -40,7 +40,8 @@ export function ExpensesModule() {
   const [isManagePresetsOpen, setIsManagePresetsOpen] = useState(false);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [pinPromptTarget, setPinPromptTarget] = useState('presets'); // 'presets' | 'categories'
+  const [pinPromptTarget, setPinPromptTarget] = useState('presets'); // 'presets' | 'categories' | 'reveal_total'
+  const [isTotalRevealed, setIsTotalRevealed] = useState(false);
 
   const handleOpenManagePresets = () => {
     if (isManager) {
@@ -63,6 +64,8 @@ export function ExpensesModule() {
   const handlePinSuccess = () => {
     if (pinPromptTarget === 'categories') {
       setIsManageCategoriesOpen(true);
+    } else if (pinPromptTarget === 'reveal_total') {
+      setIsTotalRevealed(true);
     } else {
       setIsManagePresetsOpen(true);
     }
@@ -220,7 +223,22 @@ export function ExpensesModule() {
           <div>
             <div className="text-xs text-stone-500 font-semibold">إجمالي الصرفيات المعروضة:</div>
             <div className="text-xl font-mono font-black text-rose-700 mt-0.5">
-              {totalFilteredAmount.toLocaleString()} {storeSettings.currency}
+              {(isManager || isTotalRevealed) ? (
+                `${totalFilteredAmount.toLocaleString()} ${storeSettings.currency}`
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPinPromptTarget('reveal_total');
+                    setIsPinModalOpen(true);
+                  }}
+                  title="المجموع محمي لصلاحية المدير فقط - اضغط لإدخال رمز المدير والعرض"
+                  className="inline-flex items-center gap-1.5 text-stone-400 hover:text-stone-700 font-mono tracking-widest text-lg cursor-pointer transition-colors"
+                >
+                  <span>••••••• {storeSettings.currency}</span>
+                  <Lock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                </button>
+              )}
             </div>
           </div>
           <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center font-bold text-xs">

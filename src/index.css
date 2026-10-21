@@ -82,12 +82,15 @@
   margin: 0 auto !important;
   padding: 1mm !important;
   box-sizing: border-box !important;
-  font-size: 11px;
-  line-height: 1.3;
+  font-size: var(--receipt-base-size, 12px);
+  font-weight: var(--receipt-weight, 700);
+  line-height: 1.28;
   color: #000 !important;
   background: #fff !important;
   font-family: 'Cairo', monospace, sans-serif;
   direction: rtl;
+  word-break: break-word;
+  overflow-wrap: break-word;
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
 }
@@ -152,6 +155,8 @@
     page-break-inside: avoid;
     background-color: #fff !important;
     color: #000 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }

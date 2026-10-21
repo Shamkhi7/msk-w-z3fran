@@ -24,4 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Diagnostics & System Info
   getSystemInfo: () => ipcRenderer.invoke('system:get-info'),
+
+  // Native Silent Print
+  printSilent: (options) => ipcRenderer.invoke('window:print-silent', options),
 });

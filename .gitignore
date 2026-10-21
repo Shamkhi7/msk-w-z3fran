@@ -10,6 +10,8 @@ dist-desktop/
 release/
 *.exe
 SHOP_PACKAGE_*/
+32BIT_PACKAGE/
+*.zip
 
 # Environment variables
 .env

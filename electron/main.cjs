@@ -239,6 +239,24 @@ function setupIPC() {
     userDataPath: app.getPath('userData'),
     dbPath,
   }));
+
+  // Native Silent Print of MainWindow (Retains all compiled Tailwind styles and Cairo fonts)
+  ipcMain.handle('window:print-silent', async (event, options = {}) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return { success: false, error: 'No main window' };
+    return new Promise((resolve) => {
+      mainWindow.webContents.print(
+        {
+          silent: true,
+          printBackground: true,
+          margins: { marginType: 'none' },
+          ...options,
+        },
+        (success, errorType) => {
+          resolve({ success, errorType });
+        }
+      );
+    });
+  });
 }
 
 // ==========================================

@@ -54,6 +54,7 @@ export function MenuCustomizationModal({ isOpen, onClose }) {
     products,
     reorderProducts,
     updateProductDetails,
+    updateProduct,
     storeSettings,
   } = usePOS();
 
@@ -62,6 +63,11 @@ export function MenuCustomizationModal({ isOpen, onClose }) {
     categories && categories.length > 0 ? categories[0].id : ''
   );
   const [activeColorTarget, setActiveColorTarget] = useState(null); // { type: 'cat' | 'prod', id }
+
+  const handleTransferProductCategory = (productId, newCatId) => {
+    if (!newCatId) return;
+    updateProduct(productId, { categoryId: newCatId, category: newCatId });
+  };
 
   if (!isOpen) return null;
 
@@ -392,6 +398,20 @@ export function MenuCustomizationModal({ isOpen, onClose }) {
 
                         {/* Left: Reorder Arrows & Product Card Accent Color */}
                         <div className="flex items-center gap-2 shrink-0">
+                          {/* Move to another category dropdown */}
+                          <select
+                            value={prod.categoryId || selectedCategoryId}
+                            onChange={(e) => handleTransferProductCategory(prod.id, e.target.value)}
+                            title="نقل المنتج إلى قسم آخر"
+                            className="text-[10.5px] font-bold bg-warm-100 hover:bg-white border border-stone-300 rounded-lg px-2 py-1 text-stone-700 cursor-pointer focus:outline-none max-w-[120px] truncate"
+                          >
+                            {validCategories.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+
                           {/* Color Picker Swatch */}
                           <div className="relative">
                             <button

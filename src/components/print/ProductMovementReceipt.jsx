@@ -1,17 +1,50 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
 import { ReceiptBrandingFooter } from './ReceiptBrandingFooter';
+import { isWeightedProduct } from '../../utils/productAnalyticsHelper';
+import { getReceiptTypography } from '../../utils/receiptTypographyHelper';
 
 export function ProductMovementReceipt({ reportData, storeSettings }) {
+  const typo = getReceiptTypography(storeSettings);
+
   if (!reportData || !reportData.items || reportData.items.length === 0) {
     return (
-      <div className="receipt-container text-black bg-white text-center py-4 font-bold select-none">
+      <div className="receipt-container text-black bg-white text-center py-4 font-bold select-none" style={typo.containerStyle}>
         لا توجد مبيعات أصناف مسجلة للفترة المحددة.
       </div>
     );
   }
 
-  const { items, periodLabel, totalQuantity, totalRevenue, printedAt, filteredCategory, shiftFilter, cycleStartDate } = reportData;
+  const {
+    items,
+    periodLabel,
+    totalQuantity,
+    totalRevenue,
+    printedAt,
+    filteredCategory,
+    shiftFilter,
+    cycleStartDate,
+  } = reportData;
+
+  // Resolve mold reservation statistics (Sizes 0, 1, 2, 3)
+  const moldStats =
+    reportData.moldStats ||
+    ['0', '1', '2', '3'].map((sizeStr) => {
+      const moldItem = items.find(
+        (it) => it.id === `mold-size-${sizeStr}` || it.name === `قالب كيك قياس ${sizeStr}`
+      );
+      return {
+        size: sizeStr,
+        name: `قالب كيك قياس ${sizeStr}`,
+        quantity: moldItem ? moldItem.quantity : 0,
+        totalRevenue: moldItem ? moldItem.totalRevenue : 0,
+      };
+    });
+
+  const totalMoldsQty =
+    reportData.totalMoldsQty ?? moldStats.reduce((s, m) => s + m.quantity, 0);
+  const totalMoldsRev =
+    reportData.totalMoldsRev ?? moldStats.reduce((s, m) => s + m.totalRevenue, 0);
 
   const dateObj = printedAt ? new Date(printedAt) : new Date();
   const formattedDate = dateObj.toLocaleDateString('ar-IQ', {
@@ -25,7 +58,7 @@ export function ProductMovementReceipt({ reportData, storeSettings }) {
   });
 
   return (
-    <div className="receipt-container text-black bg-white select-none">
+    <div className="receipt-container text-black bg-white select-none" style={typo.containerStyle}>
       {/* Header */}
       <div className="text-center pb-2 border-b-2 border-black space-y-0.5">
         <div className="text-base font-black tracking-wide text-black">{storeSettings.storeNameAr}</div>
@@ -91,6 +124,16 @@ export function ProductMovementReceipt({ reportData, storeSettings }) {
                   </div>
                   <div className="text-[8.5px] text-black font-mono font-bold mt-0.5">
                     [{item.categoryName || item.category || 'عام'}]
+                    {item.isMerged && (
+                      <span className="mr-1 text-black font-black">
+                        (مباشر: {item.directQuantity} ق + حجز: {item.reservationQuantity} ق)
+                      </span>
+                    )}
+                    {!item.isMerged && item.reservationQuantity > 0 && item.directQuantity === 0 && (
+                      <span className="mr-1 text-black font-bold">
+                        (حجز: {item.reservationQuantity} ق)
+                      </span>
+                    )}
                     {item.returnedQuantity > 0 && (
                       <span className="mr-1 font-bold">
                         (خصم {item.returnedQuantity % 1 !== 0 ? `${item.returnedQuantity} كغم` : `${item.returnedQuantity} ق`} مردود)
@@ -99,10 +142,49 @@ export function ProductMovementReceipt({ reportData, storeSettings }) {
                   </div>
                 </td>
                 <td className="py-1.5 text-center font-mono font-black whitespace-nowrap text-[10.5px]">
-                  {item.quantity % 1 !== 0 ? `${item.quantity} كغم` : item.quantity}
+                  {isWeightedProduct(item) || item.quantity % 1 !== 0 ? `${item.quantity} كغم` : item.quantity}
                 </td>
                 <td className="py-1.5 text-left font-mono font-black whitespace-nowrap text-[10.5px]">
                   {Number(item.totalRevenue).toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Dedicated Cake Mold Reservations Breakdown (Sizes 0 to 3) */}
+      <div className="py-2 border-b-2 border-black text-black">
+        <div className="flex justify-between items-center bg-black text-white px-2 py-0.5 text-[10px] font-black mb-1.5">
+          <span>حركة وحجوزات قوالب الكيك (0 - 3):</span>
+          <span className="font-mono text-[10.5px]">
+            {totalMoldsQty} قالب ({totalMoldsRev.toLocaleString()} {storeSettings.currency})
+          </span>
+        </div>
+        <table className="w-full text-right text-[10px]">
+          <thead>
+            <tr className="border-b border-black font-black text-black text-[9px]">
+              <th className="py-0.5 pr-0.5">قياس القالب</th>
+              <th className="py-0.5 text-center w-14">الكمية</th>
+              <th className="py-0.5 text-left w-20">الإجمالي</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-dashed divide-black">
+            {moldStats.map((m) => (
+              <tr key={m.size} className="align-middle">
+                <td className="py-1 pr-0.5 font-bold text-black text-[9.5px]">
+                  {m.name}
+                  {m.isMerged && (
+                    <span className="mr-1 font-mono text-[8px] font-normal text-black">
+                      (مباشر: {m.directQuantity} + حجز: {m.reservationQuantity})
+                    </span>
+                  )}
+                </td>
+                <td className="py-1 text-center font-mono font-black text-[10px]">
+                  {m.quantity} ق
+                </td>
+                <td className="py-1 text-left font-mono font-black text-[10px]">
+                  {Number(m.totalRevenue).toLocaleString()}
                 </td>
               </tr>
             ))}

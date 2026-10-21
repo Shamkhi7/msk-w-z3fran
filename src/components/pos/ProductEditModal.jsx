@@ -1,22 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, Trash2, Eye, EyeOff, Edit3 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
+import { isWeightedProduct } from '../../utils/productAnalyticsHelper';
 
 export function ProductEditModal({ product, isOpen, onClose }) {
-  const { updateProduct, deleteProduct, storeSettings } = usePOS();
+  const { updateProduct, deleteProduct, storeSettings, cleanCategories, categories } = usePOS();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [isAvailable, setIsAvailable] = useState(true);
+  const [pricingMode, setPricingMode] = useState('unit');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const availableCategories = (cleanCategories || categories || []).filter(
+    (c) => c.id !== 'cat-all' && c.id !== 'all'
+  );
 
   useEffect(() => {
     if (product) {
       setName(product.name || '');
       setDescription(product.description || '');
       setPrice(product.price !== undefined ? product.price : '');
+      setCategoryId(product.categoryId || product.category || (availableCategories[0]?.id || ''));
       setIsAvailable(product.isAvailable !== false);
+      const isW = product.pricingMode === 'weight' || (product.pricingMode !== 'unit' && (product.isWeighted || product.unit === 'kg' || isWeightedProduct(product)));
+      setPricingMode(isW ? 'weight' : 'unit');
       setShowDeleteConfirm(false);
     }
   }, [product, isOpen]);
@@ -28,11 +38,18 @@ export function ProductEditModal({ product, isOpen, onClose }) {
     const parsedPrice = Number(price);
     if (isNaN(parsedPrice) || parsedPrice < 0) return;
 
+    const isWeighted = pricingMode === 'weight';
+
     updateProduct(product.id, {
       name: name.trim() || product.name,
       description: description.trim(),
       price: parsedPrice,
+      categoryId: categoryId || product.categoryId,
+      category: categoryId || product.category,
       isAvailable,
+      pricingMode,
+      isWeighted,
+      unit: isWeighted ? 'kg' : 'piece',
     });
     onClose();
   };
@@ -107,6 +124,27 @@ export function ProductEditModal({ product, isOpen, onClose }) {
             />
           </div>
 
+          {/* Product Category Selector */}
+          <div>
+            <label className="block text-xs font-bold text-stone-700 mb-1">
+              القسم / التصنيف التابع له:
+            </label>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-brand-800 cursor-pointer"
+            >
+              {availableCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+            <div className="text-[10px] text-stone-500 mt-1 px-1">
+              • نقل المنتج إلى قسم آخر سيحدّث تبويبات وشبكة المبيعات فوراً
+            </div>
+          </div>
+
           {/* Visibility / Availability Toggle */}
           <div className="flex items-center justify-between p-3 bg-white border border-warm-200 rounded-xl">
             <div className="flex items-center gap-2">
@@ -128,6 +166,42 @@ export function ProductEditModal({ product, isOpen, onClose }) {
             >
               <div className="w-4 h-4 bg-white rounded-full shadow-md" />
             </button>
+          </div>
+
+          {/* Product Pricing Mode Selector */}
+          <div>
+            <label className="block text-xs font-bold text-stone-700 mb-1.5">
+              طريقة البيع / نوع التسعير:
+            </label>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-stone-100 rounded-xl border border-stone-200">
+              <button
+                type="button"
+                onClick={() => setPricingMode('unit')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  pricingMode === 'unit'
+                    ? 'bg-white text-brand-900 shadow-sm border border-stone-200 font-black'
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                <span>بالكمية / بالقطعة</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPricingMode('weight')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  pricingMode === 'weight'
+                    ? 'bg-amber-500 text-stone-950 shadow-sm font-black'
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                <span>بالوزن / بالكيلو</span>
+              </button>
+            </div>
+            <div className="text-[10px] text-stone-500 mt-1 px-1">
+              {pricingMode === 'weight'
+                ? '• يباع بالكيلوغرام: يفعّل حقول الوزن والاحتساب العكسي للأوزان وشارة "بالوزن"'
+                : '• يباع بالقطعة: بيع عادي بالكمية والأعداد الصحيحة'}
+            </div>
           </div>
 
           {/* Delete Warning / Confirm */}

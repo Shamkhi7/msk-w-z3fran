@@ -1,9 +1,12 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
 import { ReceiptBrandingFooter } from './ReceiptBrandingFooter';
+import { getReceiptTypography } from '../../utils/receiptTypographyHelper';
 
 export function ZReportReceipt({ report, storeSettings }) {
   if (!report) return null;
+
+  const typo = getReceiptTypography(storeSettings);
 
   const formatDate = (isoString) => {
     if (!isoString) return '-';
@@ -18,7 +21,7 @@ export function ZReportReceipt({ report, storeSettings }) {
   const netInflows = (directSales - salesReturns) + collectedDeposits;
 
   return (
-    <div className="receipt-container text-black bg-white select-none font-bold" style={{ color: '#000' }}>
+    <div className="receipt-container text-black bg-white select-none font-bold" style={typo.containerStyle}>
       {/* Header */}
       <div className="text-center pb-2 border-b-2 border-black">
         <div className="text-base font-black tracking-wide text-black">{storeSettings.storeNameAr}</div>
@@ -59,7 +62,7 @@ export function ZReportReceipt({ report, storeSettings }) {
           {/* Morning Shift */}
           <div className="p-1.5 border border-black rounded bg-stone-50/50 space-y-0.5">
             <div className="flex justify-between font-black text-[10.5px] border-b border-black/40 pb-0.5">
-              <span>الشفت الصباحي ☀️</span>
+              <span>الشفت الصباحي</span>
               <span className="font-bold text-[9.5px]">
                 {report.morningShift?.cashierName || 'كاشير الصباح'}
               </span>
@@ -87,7 +90,7 @@ export function ZReportReceipt({ report, storeSettings }) {
           {/* Evening Shift */}
           <div className="p-1.5 border border-black rounded bg-stone-50/50 space-y-0.5">
             <div className="flex justify-between font-black text-[10.5px] border-b border-black/40 pb-0.5">
-              <span>الشفت المسائي 🌙</span>
+              <span>الشفت المسائي</span>
               <span className="font-bold text-[9.5px]">
                 {report.eveningShift?.cashierName || 'كاشير المساء'}
               </span>
@@ -175,6 +178,19 @@ export function ZReportReceipt({ report, storeSettings }) {
             </div>
             <div className="text-[8.5px] text-black">
               * مبالغ التوصيل تخص السائقين وتم عزلها بالكامل ولا تدخل ضمن صافي نقد القاصة أعلاه.
+            </div>
+          </div>
+        )}
+
+        {/* Isolated Electronic Payments (Not part of drawer cash) */}
+        {Number(report.electronicPaymentsTotal || 0) > 0 && (
+          <div className="p-1.5 border border-dashed border-black rounded text-[9.5px] bg-white space-y-0.5 mt-1">
+            <div className="flex justify-between font-black">
+              <span>مقبوضات إلكترونية / بطاقات (معزولة عن الصندوق):</span>
+              <span className="font-mono">{Number(report.electronicPaymentsTotal).toLocaleString()} {storeSettings.currency}</span>
+            </div>
+            <div className="text-[8.5px] text-black">
+              * مبالغ البطاقات الإلكترونية معزولة عن النقد الفعلي ولا تدخل ضمن صافي نقد القاصة أعلاه.
             </div>
           </div>
         )}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BarChart3,
   Calendar,
@@ -20,14 +20,24 @@ import {
   AlertTriangle,
   X,
   Clock,
+  CreditCard,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { PeakHoursReport } from './PeakHoursReport';
+import { ElectronicPaymentsReport } from './ElectronicPaymentsReport';
+import {
+  normalizeItemTitle,
+  getCanonicalItemInfo,
+  fetchIndexedDBReservations,
+  isWeightedProduct,
+  getCartItemLineTotal,
+} from '../../utils/productAnalyticsHelper';
 
 export function ProductReportsModule() {
   const {
     salesHistory,
     salesReturns,
+    reservations,
     cleanCategories,
     categories,
     storeSettings,
@@ -38,8 +48,14 @@ export function ProductReportsModule() {
     isManager,
   } = usePOS();
 
-  // Sub-Tab Switcher: 'products' | 'peak_hours'
+  // Sub-Tab Switcher: 'products' | 'peak_hours' | 'electronic'
   const [activeReportSubTab, setActiveReportSubTab] = useState('products');
+
+  useEffect(() => {
+    if (!isManager && activeReportSubTab === 'electronic') {
+      setActiveReportSubTab('products');
+    }
+  }, [isManager, activeReportSubTab]);
 
   // Filter States
   const [periodPreset, setPeriodPreset] = useState('today'); // 'today' | 'week' | 'month' | 'all' | 'custom'
@@ -59,11 +75,28 @@ export function ProductReportsModule() {
   const [sortField, setSortField] = useState('quantity'); // 'quantity' | 'totalRevenue' | 'name' | 'category'
   const [sortDirection, setSortDirection] = useState('desc'); // 'asc' | 'desc'
 
-  const categoriesList = cleanCategories || categories || [];
+  const categoriesList = useMemo(() => {
+    const list = cleanCategories || categories || [];
+    const hasMoldsCat = list.some((c) => c.id === 'cat-molds' || (c.name && c.name.includes('قوالب')));
+    if (!hasMoldsCat) {
+      return [...list, { id: 'cat-molds', name: 'قسم القوالب / الحجوزات' }];
+    }
+    return list.map((c) => {
+      if (c.id === 'cat-molds') {
+        return {
+          ...c,
+          name: c.name.includes('حجوزات') ? c.name : `${c.name} / الحجوزات`,
+        };
+      }
+      return c;
+    });
+  }, [cleanCategories, categories]);
 
   // Category ID to Name mapping
   const categoryMap = useMemo(() => {
-    const map = {};
+    const map = {
+      'cat-molds': 'قسم القوالب / الحجوزات',
+    };
     categoriesList.forEach((c) => {
       map[c.id] = c.name;
     });
@@ -110,6 +143,38 @@ export function ProductReportsModule() {
     }
     return `${base}${shiftSuffix}`;
   }, [periodPreset, customStartDate, customEndDate, shiftFilter]);
+
+  // Historical reservation records from IndexedDB and local backup storage
+  const [indexedDbReservations, setIndexedDbReservations] = useState([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchIndexedDBReservations().then((records) => {
+      if (isMounted && records && records.length > 0) {
+        setIndexedDbReservations(records);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Merged reservations (live context + historical IndexedDB)
+  const allReservations = useMemo(() => {
+    const combined = [...(reservations || [])];
+    if (indexedDbReservations && indexedDbReservations.length > 0) {
+      const existingIds = new Set(combined.map((r) => r.id || r.receiptNumber));
+      indexedDbReservations.forEach((r) => {
+        if (!r) return;
+        const idKey = r.id || r.receiptNumber;
+        if (idKey && !existingIds.has(idKey)) {
+          existingIds.add(idKey);
+          combined.push(r);
+        }
+      });
+    }
+    return combined;
+  }, [reservations, indexedDbReservations]);
 
   // 1. Filter Sales by Date / Timeframe & Shift (respecting productMovementResetAt cycle)
   const filteredSalesByDate = useMemo(() => {
@@ -213,41 +278,148 @@ export function ProductReportsModule() {
     });
   }, [salesReturns, periodPreset, customStartDate, customEndDate, shiftFilter, productMovementResetAt]);
 
-  // 2. Aggregate Sales Item by Item & Deduct Sales Returns
+  // 1.2 Filter Reservations by Creation Date & Shift (respecting productMovementResetAt cycle)
+  const filteredReservationsByDate = useMemo(() => {
+    const now = new Date();
+    const todayLocalStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    return (allReservations || []).filter((res) => {
+      // Exclude cancelled reservations
+      if (res.status === 'ملغي') return false;
+
+      // Has either mold, slices, packaging, or items
+      const hasMold =
+        res.hasMold !== false &&
+        (res.cakeSize || res.hasMold || (Array.isArray(res.cakeMolds) && res.cakeMolds.length > 0));
+      const hasSlices =
+        res.hasSlices ||
+        res.reservationType === 'cake_slices' ||
+        (Array.isArray(res.sliceTiers) && res.sliceTiers.length > 0) ||
+        Number(res.totalPieces) > 0;
+      const hasPackaging = Boolean(res.hasPackaging);
+      const hasExtras =
+        (Array.isArray(res.items) && res.items.length > 0) ||
+        (Array.isArray(res.extras) && res.extras.length > 0);
+
+      if (!hasMold && !hasSlices && !hasPackaging && !hasExtras) return false;
+
+      // Shift filter check
+      if (shiftFilter !== 'ALL') {
+        const itemShift = res.shiftType || 'صباحي';
+        if (itemShift !== shiftFilter) return false;
+      }
+
+      // Filter by creation date
+      const dateRaw = res.createdAt || res.date;
+      if (!dateRaw) return true;
+      const resDate = new Date(dateRaw);
+      if (isNaN(resDate.getTime())) return true;
+
+      // Filter out reservations before the reset cycle timestamp
+      if (productMovementResetAt) {
+        const resetDate = new Date(productMovementResetAt);
+        if (!isNaN(resetDate.getTime()) && resDate < resetDate) {
+          return false;
+        }
+      }
+
+      const resLocalStr = `${resDate.getFullYear()}-${String(resDate.getMonth() + 1).padStart(2, '0')}-${String(resDate.getDate()).padStart(2, '0')}`;
+
+      if (periodPreset === 'today') {
+        return resLocalStr === todayLocalStr;
+      }
+      if (periodPreset === 'week') {
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return resDate >= sevenDaysAgo;
+      }
+      if (periodPreset === 'month') {
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        return resDate >= thirtyDaysAgo;
+      }
+      if (periodPreset === 'custom') {
+        if (customStartDate) {
+          const start = new Date(customStartDate + 'T00:00:00');
+          if (resDate < start) return false;
+        }
+        if (customEndDate) {
+          const end = new Date(customEndDate + 'T23:59:59');
+          if (resDate > end) return false;
+        }
+        return true;
+      }
+      return true; // 'all'
+    });
+  }, [allReservations, periodPreset, customStartDate, customEndDate, shiftFilter, productMovementResetAt]);
+
+  // 2. Aggregate Direct Sales + Slices + Molds + Extras & Deduct Sales Returns
   const aggregatedItems = useMemo(() => {
     const map = {};
 
-    // 2.1 Add active sales
+    // Helper to record an item from any source
+    const recordEntry = ({ canonical, quantity, revenue, isDirect = false, isReservation = false }) => {
+      const key = canonical.key;
+      const catId = canonical.categoryId || 'cat-cakes';
+      const catName = categoryMap[catId] || canonical.categoryName || 'عام';
+
+      if (!map[key]) {
+        map[key] = {
+          id: key,
+          name: canonical.name,
+          categoryId: catId,
+          categoryName: catName,
+          quantity: 0,
+          totalRevenue: 0,
+          ordersCount: 0,
+          returnedQuantity: 0,
+          returnedRevenue: 0,
+          directQuantity: 0,
+          directRevenue: 0,
+          reservationQuantity: 0,
+          reservationRevenue: 0,
+          isReservationMold: canonical.isMold || false,
+          isReservationSlice: canonical.isSlice || false,
+          moldSize: canonical.moldSize,
+          isMerged: false,
+        };
+      }
+
+      map[key].quantity += quantity;
+      map[key].totalRevenue += revenue;
+      map[key].ordersCount += 1;
+
+      if (isDirect) {
+        map[key].directQuantity += quantity;
+        map[key].directRevenue += revenue;
+      }
+      if (isReservation) {
+        map[key].reservationQuantity += quantity;
+        map[key].reservationRevenue += revenue;
+        if (canonical.isMold) map[key].isReservationMold = true;
+        if (canonical.isSlice) map[key].isReservationSlice = true;
+      }
+    };
+
+    // 2.1 Direct counter sales
     filteredSalesByDate.forEach((sale) => {
       (sale.items || []).forEach((item) => {
-        // Skip reservation service deposits if not a physical product
+        // Skip reservation service deposits & remaining balance line items (drawer financial records)
         const isDeposit = item.product?.isDeposit || item.product?.id === 'service-deposit';
-        const key = item.product?.id || item.product?.name || item.name || 'item';
-        const name = item.product?.name || item.name || 'صنف';
-        const rawCat = item.product?.category || item.category || 'cat-cakes';
-        const categoryName = isDeposit ? 'عربون حجز' : (categoryMap[rawCat] || rawCat || 'عام');
+        const isRemaining =
+          item.product?.id === 'service-remaining' ||
+          (item.product?.name && String(item.product.name).startsWith('متبقي حجز'));
+        if (isDeposit || isRemaining) return;
+
+        const canonical = getCanonicalItemInfo(item);
         const qty = Number(item.quantity) || 1;
         const unitPrice = Number(item.unitPrice) || Number(item.price) || 0;
-        const discount = Number(item.discount) || 0;
-        const lineTotal = Math.max(0, unitPrice * qty - discount);
+        const lineTotal = getCartItemLineTotal(item);
 
-        if (!map[key]) {
-          map[key] = {
-            id: key,
-            name,
-            categoryId: rawCat,
-            categoryName,
-            quantity: 0,
-            totalRevenue: 0,
-            ordersCount: 0,
-            returnedQuantity: 0,
-            returnedRevenue: 0,
-          };
-        }
-
-        map[key].quantity += qty;
-        map[key].totalRevenue += lineTotal;
-        map[key].ordersCount += 1;
+        recordEntry({
+          canonical,
+          quantity: qty,
+          revenue: lineTotal,
+          isDirect: true,
+        });
       });
     });
 
@@ -255,31 +427,206 @@ export function ProductReportsModule() {
     filteredReturnsByDate.forEach((ret) => {
       if (Array.isArray(ret.items) && ret.items.length > 0) {
         ret.items.forEach((item) => {
-          const key = item.id || item.name;
-          const retQty = Number(item.quantity) || 1;
-          const retAmount = Number(item.price) || (Number(item.unitPrice) || 0) * retQty;
-
-          // Find matching key in map (by id or exact name)
-          let target = map[key];
+          const canonical = getCanonicalItemInfo(item);
+          let target = map[canonical.key];
           if (!target) {
+            const normName = normalizeItemTitle(item.name);
             const foundKey = Object.keys(map).find(
-              (k) => map[k].name === item.name || map[k].id === item.id
+              (k) => map[k].name === item.name || map[k].id === item.id || normalizeItemTitle(map[k].name) === normName
             );
             if (foundKey) target = map[foundKey];
           }
 
           if (target) {
+            const retQty = Number(item.quantity) || 1;
+            const retAmount = Number(item.price) || (Number(item.unitPrice) || 0) * retQty;
             target.returnedQuantity = Math.round(((target.returnedQuantity || 0) + retQty) * 1000) / 1000;
             target.returnedRevenue = (target.returnedRevenue || 0) + retAmount;
             target.quantity = Math.max(0, Math.round((target.quantity - retQty) * 1000) / 1000);
             target.totalRevenue = Math.max(0, Math.round(target.totalRevenue - retAmount));
+            if (target.directQuantity > 0) {
+              target.directQuantity = Math.max(0, Math.round((target.directQuantity - retQty) * 1000) / 1000);
+              target.directRevenue = Math.max(0, Math.round(target.directRevenue - retAmount));
+            }
           }
         });
       }
     });
 
+    // 2.3 Aggregate Reservation Molds, Accompanying Slices, Packaging & Extras
+    filteredReservationsByDate.forEach((res) => {
+      // A. Molds (Sizes 0, 1, 2, 3)
+      let molds = [];
+      if (Array.isArray(res.cakeMolds) && res.cakeMolds.length > 0) {
+        molds = res.cakeMolds;
+      } else if (res.hasMold !== false && (res.cakeSize || res.hasMold)) {
+        molds = [
+          {
+            cakeSize: res.cakeSize || '2',
+            moldPrice: Number(res.moldPrice) || Number(res.totalCost) || 0,
+          },
+        ];
+      }
+
+      molds.forEach((mold) => {
+        const rawSize = String(mold.cakeSize || mold.size || '2').trim();
+        let size = '2';
+        if (rawSize.includes('0')) size = '0';
+        else if (rawSize.includes('1')) size = '1';
+        else if (rawSize.includes('2')) size = '2';
+        else if (rawSize.includes('3')) size = '3';
+        else size = rawSize;
+
+        let price = Number(mold.moldPrice);
+        if (isNaN(price) || price <= 0) {
+          const rMoldPrice = Number(res.moldPrice) || 0;
+          const rTotal = Number(res.totalCost) || 0;
+          if (rMoldPrice > 0) {
+            price = rMoldPrice / molds.length;
+          } else if (rTotal > 0) {
+            price = rTotal / molds.length;
+          } else {
+            price = 0;
+          }
+        }
+
+        const canonical = getCanonicalItemInfo({
+          name: `قالب كيك قياس ${size}`,
+          moldSize: size,
+          isMold: true,
+          categoryId: 'cat-molds',
+        });
+
+        recordEntry({
+          canonical,
+          quantity: 1,
+          revenue: Math.round(price),
+          isReservation: true,
+        });
+      });
+
+      // B. Accompanying Slices (sliceTiers e.g. 500, 750, 1000, 1500, 2000)
+      if (Array.isArray(res.sliceTiers) && res.sliceTiers.length > 0) {
+        res.sliceTiers.forEach((tier) => {
+          const tierPrice = Number(tier.tierPrice) || 0;
+          const qty = Number(tier.quantity) || 0;
+          if (qty <= 0) return;
+          const subtotal = Number(tier.subtotal) || (tierPrice * qty);
+
+          const canonical = getCanonicalItemInfo({
+            name: `قطع كيك ${tierPrice}`,
+            tierPrice,
+            isSlice: true,
+            categoryId: 'cat-cakes',
+          });
+
+          recordEntry({
+            canonical,
+            quantity: qty,
+            revenue: Math.round(subtotal),
+            isReservation: true,
+          });
+        });
+      } else if (res.hasSlices && Number(res.totalPieces) > 0) {
+        // Fallback for legacy slice reservations
+        const pieces = Number(res.totalPieces) || 0;
+        const slicesRev = Number(res.slicesTotal) || 0;
+        const unitPrice = pieces > 0 ? Math.round(slicesRev / pieces) : 500;
+
+        const canonical = getCanonicalItemInfo({
+          name: `قطع كيك ${unitPrice}`,
+          tierPrice: unitPrice,
+          isSlice: true,
+          categoryId: 'cat-cakes',
+        });
+
+        recordEntry({
+          canonical,
+          quantity: pieces,
+          revenue: Math.round(slicesRev),
+          isReservation: true,
+        });
+      }
+
+      // C. Accompanying Packaging
+      if (res.hasPackaging && (Number(res.packagingTotal) > 0 || Number(res.totalPieces) > 0)) {
+        const pkgQty = Number(res.totalPieces) || 1;
+        const pkgRev = Number(res.packagingTotal) || (Number(res.packagingFeePerPiece || 250) * pkgQty);
+
+        const canonical = getCanonicalItemInfo({
+          name: 'تغليف قطع كيك',
+          categoryId: 'cat-supplies',
+        });
+
+        recordEntry({
+          canonical,
+          quantity: pkgQty,
+          revenue: Math.round(pkgRev),
+          isReservation: true,
+        });
+      }
+
+      // D. Extras / side items attached to reservations (if any)
+      const extras = res.items || res.extras || res.additionalItems || [];
+      if (Array.isArray(extras) && extras.length > 0) {
+        extras.forEach((extra) => {
+          const eName = extra.name || extra.title;
+          if (!eName) return;
+          const eQty = Number(extra.quantity) || 1;
+          const ePrice = Number(extra.price) || Number(extra.unitPrice) || 0;
+          const eTotal = Number(extra.total) || (ePrice * eQty);
+
+          const canonical = getCanonicalItemInfo({
+            name: eName,
+            categoryId: extra.categoryId || 'cat-cakes',
+          });
+
+          recordEntry({
+            canonical,
+            quantity: eQty,
+            revenue: Math.round(eTotal),
+            isReservation: true,
+          });
+        });
+      }
+    });
+
+    // 2.4 Mark consolidated / merged items (both direct sales & reservation bookings)
+    Object.values(map).forEach((item) => {
+      if (item.directQuantity > 0 && item.reservationQuantity > 0) {
+        item.isMerged = true;
+      }
+    });
+
+    // 2.5 If filtering specifically by molds, guarantee all 4 mold sizes (0, 1, 2, 3) exist even if quantity is 0
+    if (selectedCategory === 'cat-molds') {
+      ['0', '1', '2', '3'].forEach((s) => {
+        const key = `mold-size-${s}`;
+        if (!map[key]) {
+          map[key] = {
+            id: key,
+            name: `قالب كيك قياس ${s}`,
+            categoryId: 'cat-molds',
+            categoryName: categoryMap['cat-molds'] || 'قسم القوالب / الحجوزات',
+            quantity: 0,
+            totalRevenue: 0,
+            ordersCount: 0,
+            returnedQuantity: 0,
+            returnedRevenue: 0,
+            directQuantity: 0,
+            directRevenue: 0,
+            reservationQuantity: 0,
+            reservationRevenue: 0,
+            isReservationMold: true,
+            moldSize: s,
+            isMerged: false,
+          };
+        }
+      });
+    }
+
     return Object.values(map);
-  }, [filteredSalesByDate, filteredReturnsByDate, categoryMap]);
+  }, [filteredSalesByDate, filteredReturnsByDate, filteredReservationsByDate, categoryMap, selectedCategory]);
 
   // 3. Search & Category Filtering
   const displayedItems = useMemo(() => {
@@ -295,9 +642,14 @@ export function ProductReportsModule() {
         const matchesCategory =
           selectedCategory === 'ALL' ||
           item.categoryId === selectedCategory ||
-          item.categoryName === selectedCategory;
+          item.categoryName === selectedCategory ||
+          (selectedCategory === 'cat-molds' && item.isReservationMold) ||
+          (selectedCategory === 'cat-cakes' && item.isReservationSlice);
 
-        return matchesQuery && matchesCategory;
+        // When viewing ALL categories, hide 0-quantity items to keep report focused
+        const hasActivity = item.quantity > 0 || (selectedCategory === 'cat-molds' && item.isReservationMold);
+
+        return matchesQuery && matchesCategory && hasActivity;
       })
       .sort((a, b) => {
         let valA = a[sortField];
@@ -374,8 +726,30 @@ export function ProductReportsModule() {
 
   // Trigger Thermal Receipt Printing
   const handlePrintReport = () => {
+    // Generate complete 4-size breakdown (Sizes 0, 1, 2, 3) for the thermal receipt
+    const moldStats = ['0', '1', '2', '3'].map((sizeStr) => {
+      const moldItem = aggregatedItems.find(
+        (it) => it.id === `mold-size-${sizeStr}` || it.name === `قالب كيك قياس ${sizeStr}`
+      );
+      return {
+        size: sizeStr,
+        name: `قالب كيك قياس ${sizeStr}`,
+        quantity: moldItem ? moldItem.quantity : 0,
+        totalRevenue: moldItem ? moldItem.totalRevenue : 0,
+        isMerged: moldItem ? moldItem.isMerged : false,
+        directQuantity: moldItem ? moldItem.directQuantity : 0,
+        reservationQuantity: moldItem ? moldItem.reservationQuantity : 0,
+      };
+    });
+
+    const totalMoldsQty = moldStats.reduce((sum, m) => sum + m.quantity, 0);
+    const totalMoldsRev = moldStats.reduce((sum, m) => sum + m.totalRevenue, 0);
+
     const reportData = {
       items: displayedItems,
+      moldStats,
+      totalMoldsQty,
+      totalMoldsRev,
       periodLabel,
       totalQuantity: totals.totalQuantity,
       totalRevenue: totals.totalRevenue,
@@ -399,12 +773,16 @@ export function ProductReportsModule() {
             <h2 className="text-base sm:text-lg font-black text-brand-900 leading-tight">
               {activeReportSubTab === 'products'
                 ? 'تقرير مبيعات وحركة الأصناف'
-                : 'تقرير ساعات الذروة ومقارنة الشفتات'}
+                : activeReportSubTab === 'peak_hours'
+                ? 'تقرير ساعات الذروة ومقارنة الشفتات'
+                : 'تقرير مبيعات الدفع الإلكتروني (البطاقات)'}
             </h2>
             <p className="text-[11px] text-stone-500">
               {activeReportSubTab === 'products'
                 ? 'تحليل حركة بيع المنتجات والكميات والعائد المالي حسب الفترة المحددة مع خصم المردودات تلقائياً'
-                : 'تحليل أوقات الذروة الساعية، وتوزيع الإيراد وأداء الشفت الصباحي مقابل المسائي'}
+                : activeReportSubTab === 'peak_hours'
+                ? 'تحليل أوقات الذروة الساعية، وتوزيع الإيراد وأداء الشفت الصباحي مقابل المسائي'
+                : 'تحليل دقيق لكافة مقبوضات البطاقات والشبكة والمعزولة بالكامل عن الصندوق النقدي'}
             </p>
           </div>
         </div>
@@ -432,8 +810,22 @@ export function ProductReportsModule() {
             }`}
           >
             <Clock className="w-3.5 h-3.5 text-gold-400" />
-            <span>ساعات الذروة والشفتات ⚡</span>
+            <span>ساعات الذروة والشفتات</span>
           </button>
+          {isManager && (
+            <button
+              type="button"
+              onClick={() => setActiveReportSubTab('electronic')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeReportSubTab === 'electronic'
+                  ? 'bg-brand-800 text-white shadow-xs'
+                  : 'text-stone-700 hover:bg-white/60'
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5 text-gold-400" />
+              <span>مبيعات الدفع الإلكتروني</span>
+            </button>
+          )}
         </div>
 
         {/* Action Buttons Group (Shown for products sub-tab) */}
@@ -466,10 +858,12 @@ export function ProductReportsModule() {
 
       {activeReportSubTab === 'peak_hours' ? (
         <PeakHoursReport />
+      ) : activeReportSubTab === 'electronic' ? (
+        <ElectronicPaymentsReport />
       ) : (
-        <>
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
           {/* Active Statistical Cycle Badge & Alerts */}
-          <div className="px-3 sm:px-4 pt-3 space-y-2">
+          <div className="space-y-2">
         {productMovementResetAt && (
           <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold">
             <div className="flex items-center gap-2">
@@ -505,7 +899,7 @@ export function ProductReportsModule() {
       </div>
 
       {/* KPI Overview Cards */}
-      <div className="p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* 1. Total Units Sold */}
         <div className="bg-white p-3.5 rounded-2xl border border-warm-200 shadow-xs flex items-center justify-between">
           <div>
@@ -581,7 +975,9 @@ export function ProductReportsModule() {
               {displayedItems.length}{' '}
               <span className="text-xs font-sans font-normal text-stone-500">صنفاً مباعاً</span>
             </div>
-            <div className="text-[10px] text-stone-400 mt-0.5">من {filteredSalesByDate.length} طلبية وفاتورة</div>
+            <div className="text-[10px] text-stone-400 mt-0.5">
+              من {filteredSalesByDate.length} فاتورة و {filteredReservationsByDate.length} حجز
+            </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-stone-100 text-stone-700 flex items-center justify-center font-bold">
             <BarChart3 className="w-5 h-5" />
@@ -590,7 +986,7 @@ export function ProductReportsModule() {
       </div>
 
       {/* Filter Toolbar */}
-      <div className="px-3 sm:px-4 pb-3 space-y-2.5">
+      <div className="space-y-2.5">
         {/* Row 1: Quick Period Presets */}
         <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-2.5 rounded-2xl border border-warm-200 shadow-xs">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 flex-1">
@@ -713,78 +1109,76 @@ export function ProductReportsModule() {
       </div>
 
       {/* Main Aggregation Table */}
-      <div className="flex-1 px-3 sm:px-4 pb-4 overflow-y-auto">
-        <div className="bg-white border border-warm-200 rounded-2xl shadow-xs overflow-hidden flex flex-col h-full">
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-warm-100 text-stone-700 font-bold border-b border-warm-200 sticky top-0 z-10">
-                <tr>
-                  <th className="py-3 px-3 w-10 text-center">#</th>
+      <div className="bg-white border border-warm-200 rounded-2xl shadow-xs">
+        <table className="w-full text-right text-xs">
+          <thead className="bg-warm-100 text-stone-700 font-bold border-b border-warm-200 sticky top-0 z-10 shadow-xs">
+            <tr>
+              <th className="py-3 px-3 w-10 text-center sticky top-0 bg-warm-100 z-10 first:rounded-tr-2xl">#</th>
 
-                  {/* Column 1: Product Name */}
-                  <th
-                    onClick={() => handleSort('name')}
-                    className="py-3 px-3 cursor-pointer hover:bg-warm-200/70 transition-colors"
-                  >
-                    <div className="flex items-center gap-1">
-                      <span>اسم المنتج (Product Name)</span>
-                      {sortField === 'name' ? (
-                        sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-stone-400" />
-                      )}
-                    </div>
-                  </th>
+              {/* Column 1: Product Name */}
+              <th
+                onClick={() => handleSort('name')}
+                className="py-3 px-3 cursor-pointer hover:bg-warm-200/70 transition-colors sticky top-0 bg-warm-100 z-10"
+              >
+                <div className="flex items-center gap-1">
+                  <span>اسم المنتج (Product Name)</span>
+                  {sortField === 'name' ? (
+                    sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />
+                  ) : (
+                    <ArrowUpDown className="w-3 h-3 text-stone-400" />
+                  )}
+                </div>
+              </th>
 
-                  {/* Column 2: Category */}
-                  <th
-                    onClick={() => handleSort('categoryName')}
-                    className="py-3 px-3 cursor-pointer hover:bg-warm-200/70 transition-colors"
-                  >
-                    <div className="flex items-center gap-1">
-                      <span>القسم (Category)</span>
-                      {sortField === 'categoryName' ? (
-                        sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-stone-400" />
-                      )}
-                    </div>
-                  </th>
+              {/* Column 2: Category */}
+              <th
+                onClick={() => handleSort('categoryName')}
+                className="py-3 px-3 cursor-pointer hover:bg-warm-200/70 transition-colors sticky top-0 bg-warm-100 z-10"
+              >
+                <div className="flex items-center gap-1">
+                  <span>القسم (Category)</span>
+                  {sortField === 'categoryName' ? (
+                    sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />
+                  ) : (
+                    <ArrowUpDown className="w-3 h-3 text-stone-400" />
+                  )}
+                </div>
+              </th>
 
-                  {/* Column 3: Quantity Sold */}
-                  <th
-                    onClick={() => handleSort('quantity')}
-                    className="py-3 px-3 cursor-pointer hover:bg-warm-200/70 transition-colors text-center"
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <span>الكمية المباعة (Total Quantity)</span>
-                      {sortField === 'quantity' ? (
-                        sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-stone-400" />
-                      )}
-                    </div>
-                  </th>
+              {/* Column 3: Quantity Sold */}
+              <th
+                onClick={() => handleSort('quantity')}
+                className="py-3 px-3 cursor-pointer hover:bg-warm-200/70 transition-colors text-center sticky top-0 bg-warm-100 z-10"
+              >
+                <div className="flex items-center justify-center gap-1">
+                  <span>الكمية المباعة (Total Quantity)</span>
+                  {sortField === 'quantity' ? (
+                    sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />
+                  ) : (
+                    <ArrowUpDown className="w-3 h-3 text-stone-400" />
+                  )}
+                </div>
+              </th>
 
-                  {/* Column 4: Total Revenue */}
-                  <th
-                    onClick={() => handleSort('totalRevenue')}
-                    className="py-3 px-3 cursor-pointer hover:bg-warm-200/70 transition-colors text-left"
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <span>إجمالي القيمة (Total Revenue)</span>
-                      {sortField === 'totalRevenue' ? (
-                        sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-stone-400" />
-                      )}
-                    </div>
-                  </th>
+              {/* Column 4: Total Revenue */}
+              <th
+                onClick={() => handleSort('totalRevenue')}
+                className="py-3 px-3 cursor-pointer hover:bg-warm-200/70 transition-colors text-left sticky top-0 bg-warm-100 z-10"
+              >
+                <div className="flex items-center justify-end gap-1">
+                  <span>إجمالي القيمة (Total Revenue)</span>
+                  {sortField === 'totalRevenue' ? (
+                    sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />
+                  ) : (
+                    <ArrowUpDown className="w-3 h-3 text-stone-400" />
+                  )}
+                </div>
+              </th>
 
-                  {/* Column 5: Share % */}
-                  <th className="py-3 px-3 text-center w-24">النسبة %</th>
-                </tr>
-              </thead>
+              {/* Column 5: Share % */}
+              <th className="py-3 px-3 text-center w-24 sticky top-0 bg-warm-100 z-10 last:rounded-tl-2xl">النسبة %</th>
+            </tr>
+          </thead>
               <tbody className="divide-y divide-warm-100">
                 {displayedItems.length === 0 ? (
                   <tr>
@@ -805,7 +1199,24 @@ export function ProductReportsModule() {
                           {idx + 1}
                         </td>
                         <td className="py-3 px-3 font-bold text-stone-900">
-                          {item.name}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{item.name}</span>
+                            {item.isMerged ? (
+                              <span
+                                className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-300 shadow-2xs shrink-0 flex items-center gap-1"
+                                title={`مدمج: مبيعات مباشرة (${item.directQuantity}) + حجوزات (${item.reservationQuantity})`}
+                              >
+                                <span>⚡ دمج:</span>
+                                <span className="font-mono">
+                                  مباشر ({item.directQuantity}) + حجز ({item.reservationQuantity})
+                                </span>
+                              </span>
+                            ) : item.reservationQuantity > 0 && item.directQuantity === 0 ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9.5px] bg-amber-100 text-amber-900 border border-amber-300 font-bold shrink-0">
+                                {item.isReservationMold ? 'حجز قالب 🎂' : item.isReservationSlice ? 'حجز قطع 🍰' : 'حجز 📋'}
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="py-3 px-3">
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-warm-100 text-brand-900 border border-warm-200">
@@ -816,13 +1227,16 @@ export function ProductReportsModule() {
                           <div>
                             {item.quantity.toLocaleString('ar-IQ', { maximumFractionDigits: 3 })}{' '}
                             <span className="text-[10px] font-sans font-normal text-stone-500">
-                              {item.quantity % 1 !== 0 ? 'كغم' : 'قطعة'}
+                              {isWeightedProduct(item) || item.quantity % 1 !== 0 ? 'كغم' : 'قطعة'}
                             </span>
                           </div>
                           {item.returnedQuantity > 0 && (
                             <div className="text-[10px] text-rose-700 font-bold font-sans mt-0.5 flex items-center justify-center gap-0.5">
                               <RotateCcw className="w-2.5 h-2.5" />
-                              <span>خصم {item.returnedQuantity} {item.returnedQuantity % 1 !== 0 ? 'كغم' : 'قطعة'} مردود</span>
+                              <span>
+                                خصم {item.returnedQuantity}{' '}
+                                {isWeightedProduct(item) || item.returnedQuantity % 1 !== 0 ? 'كغم' : 'قطعة'} مردود
+                              </span>
                             </div>
                           )}
                         </td>
@@ -850,7 +1264,6 @@ export function ProductReportsModule() {
                 )}
               </tbody>
             </table>
-          </div>
 
           {/* Bottom Fixed Summary Row */}
           {displayedItems.length > 0 && (
@@ -893,7 +1306,6 @@ export function ProductReportsModule() {
           )}
         </div>
       </div>
-      </>
       )}
 
       {/* Manager-Protected Product Movement Reset Modal */}

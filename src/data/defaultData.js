@@ -171,7 +171,20 @@ export const DEFAULT_PRODUCTS = [
     isService: false,
   },
 
-  // حلويات شرقية
+  // حلويات شرقية ومعجنات بالوزن
+  {
+    id: 'prod-sweet-5',
+    name: 'بيتيفور مشكل فاخر (كغم)',
+    categoryId: 'cat-sweets',
+    price: 10000,
+    cost: 5000,
+    barcode: 'MZ-0405',
+    isAvailable: true,
+    isService: false,
+    isWeighted: true,
+    unit: 'kg',
+    description: 'بيتيفور فاخر بالزبدة والكاكاو والمربى (يباع بالوزن)',
+  },
   {
     id: 'prod-sweet-1',
     name: 'صحن بقلاوة بالفستق الحلبي (1 كغم)',
@@ -181,6 +194,34 @@ export const DEFAULT_PRODUCTS = [
     barcode: 'MZ-0401',
     isAvailable: true,
     isService: false,
+    isWeighted: true,
+    unit: 'kg',
+  },
+  {
+    id: 'prod-sweet-6',
+    name: 'بقلاوة مشكلة فاخرة (كغم)',
+    categoryId: 'cat-sweets',
+    price: 22000,
+    cost: 11000,
+    barcode: 'MZ-0406',
+    isAvailable: true,
+    isService: false,
+    isWeighted: true,
+    unit: 'kg',
+    description: 'تشكيلة بقلاوة أصابع ومبرومة وكول وشكور (تباع بالوزن)',
+  },
+  {
+    id: 'prod-sweet-7',
+    name: 'مكسرات محمصة مشكلة فاخرة (كغم)',
+    categoryId: 'cat-sweets',
+    price: 20000,
+    cost: 12000,
+    barcode: 'MZ-0407',
+    isAvailable: true,
+    isService: false,
+    isWeighted: true,
+    unit: 'kg',
+    description: 'مكسرات مشكلة محمصة ممتازة (تباع بالوزن)',
   },
   {
     id: 'prod-sweet-2',
@@ -191,6 +232,8 @@ export const DEFAULT_PRODUCTS = [
     barcode: 'MZ-0402',
     isAvailable: true,
     isService: false,
+    isWeighted: true,
+    unit: 'kg',
   },
   {
     id: 'prod-sweet-3',
@@ -201,6 +244,8 @@ export const DEFAULT_PRODUCTS = [
     barcode: 'MZ-0403',
     isAvailable: true,
     isService: false,
+    isWeighted: true,
+    unit: 'kg',
   },
   {
     id: 'prod-sweet-4',
@@ -211,6 +256,8 @@ export const DEFAULT_PRODUCTS = [
     barcode: 'MZ-0404',
     isAvailable: true,
     isService: false,
+    isWeighted: true,
+    unit: 'kg',
   },
 
   // معجنات وفطائر
@@ -356,6 +403,197 @@ export const DEFAULT_PRODUCTS = [
   }
 ];
 
+export const DEFAULT_SALES_RECEIPT_CONFIG = {
+  ticketTitle: 'فاتورة مبيعات',
+  showLogo: true,
+  logoContrast: 160, // 100% to 300%
+  logoSize: 48, // 30px to 70px
+  storeHeaderSize: 20,
+  storeHeaderBold: true,
+  storeHeaderAlign: 'center', // 'center' | 'right'
+  showTagline: true,
+  showPhones: true,
+  showAddress: true,
+  showStoreNameEn: true,
+  customerLabel: 'الزبون:',
+  phoneLabel: 'رقم الهاتف:',
+  cashierLabel: 'الكاشير:',
+  customerNameSize: 14,
+  customerNameBold: true,
+  customerPhoneSize: 12,
+  customerPhoneBold: true,
+  itemNameSize: 15,
+  itemNameBold: true,
+  priceSize: 14,
+  priceBold: true,
+  rowPadding: 'normal', // 'compact' | 'normal' | 'relaxed'
+  showRoundingDiscount: true,
+  showPaymentMethodBadge: true,
+  showSubtotal: true,
+  totalsSize: 15,
+  totalsBold: true,
+  dividerStyle: 'dashed', // 'dashed' | 'solid' | 'double' | 'none'
+  totalsBorderStyle: 'solid', // 'solid' | 'double' | 'dashed' | 'none'
+  footerMessage: 'شكراً لاختياركم مسك وزعفران | يسعدنا تقييمكم وزيارتكم مجدداً',
+  footerSize: 10,
+  showBarcode: true,
+  showBrandCredits: true,
+};
+
+export const DEFAULT_RESERVATION_RECEIPT_CONFIG = {
+  ticketTitle: 'وصل حجز وتثبيت طلبية كيك',
+  showLogo: true,
+  logoContrast: 160,
+  logoSize: 48,
+  storeHeaderSize: 19,
+  storeHeaderBold: true,
+  storeHeaderAlign: 'center',
+  showTagline: true,
+  showPhones: true,
+  showAddress: true,
+  showStoreNameEn: true,
+  manualTicketLabel: 'رقم الحجز اليدوي:',
+  systemTicketLabel: 'رقم الحجز بالنظام:',
+  customerLabel: 'اسم الزبون:',
+  phoneLabel: 'رقم الهاتف:',
+  workerLabel: 'الموظف المسجل:',
+  pickupHeaderLabel: 'تاريخ ووقت الاستلام:',
+  inscriptionLabel: 'العبارة المطلوبة على القالب:',
+  flavorLabel: 'نكهة وحشوة القالب:',
+  designLabel: 'تفاصيل الشكل والتصميم:',
+  customerNameSize: 16,
+  customerNameBold: true,
+  customerPhoneSize: 14,
+  customerPhoneBold: true,
+  customerDetailsSize: 15, // backwards compatibility
+  customerDetailsBold: true,
+  manualTicketSize: 22,
+  manualTicketBold: true,
+  pickupBannerSize: 17,
+  pickupBannerBold: true,
+  showCustomerPhone: true,
+  showDeliveryAddress: true,
+  showPickupDateTime: true,
+  showWorkerName: true,
+  inscriptionSize: 16,
+  inscriptionBold: true,
+  specsSize: 12,
+  specsBold: true,
+  showWrittenText: true,
+  showFlavor: true,
+  showDesign: true,
+  showChefNotes: true,
+  highlightDeposit: true,
+  depositSize: 15,
+  highlightRemaining: true,
+  remainingBalanceSize: 18,
+  dividerStyle: 'dashed',
+  financialBorderStyle: 'solid',
+  policyDisclaimer: '* يرجى إبراز هذا الوصل عند استلام الطلبية في الموعد المحدد أعلاه.\n* العربون غير قابل للاسترداد بعد البدء بتجهيز الطلب.',
+  footerSize: 10,
+  showBarcode: true,
+  showBrandCredits: true,
+};
+
+export const DEFAULT_KITCHEN_TICKET_CONFIG = {
+  ticketTitle: 'بون المعمل والإنتاج (للشيف)', // Thermal-safe text, no raw unicode emojis that cause broken boxes
+  showLogo: false, // Hidden by default on kitchen tickets to save paper, but toggleable
+  logoContrast: 160,
+  logoSize: 48,
+  hideAllPrices: true, // Strictly HIDE all prices, totals, deposits, and payment details
+  manualTicketLabel: 'رقم الحجز اليدوي:',
+  systemTicketLabel: 'رقم الحجز بالنظام:',
+  customerLabel: 'اسم الزبون:',
+  phoneLabel: 'رقم الهاتف:',
+  workerLabel: 'الموظف المستلم للحجز:',
+  pickupHeaderLabel: 'تاريخ وموعد تسليم الطلبية للشيف:',
+  inscriptionLabel: 'العبارة المطلوبة بالكريمة:',
+  flavorLabel: 'نكهة وحشوة القالب:',
+  designLabel: 'تفاصيل الشكل والتصميم:',
+  manualTicketSize: 24,
+  manualTicketBold: true,
+  pickupBannerSize: 18, // Extra Large for immediate kitchen visibility
+  pickupBannerBold: true,
+  customerNameSize: 16,
+  customerNameBold: true,
+  customerPhoneSize: 14,
+  customerPhoneBold: true,
+  showCustomerPhone: true,
+  showDeliveryAddress: true,
+  specsAndNotesSize: 14,
+  specsAndNotesBold: true,
+  inscriptionSize: 18, // Extra prominent for cake decorator
+  inscriptionBold: true,
+  decoratedInscriptionFrame: true, // Prominent decorative frame for the cake decorator
+  showWrittenText: true,
+  showFlavor: true,
+  showDesign: true,
+  showChefNotes: true,
+  dividerStyle: 'dashed',
+  footerSize: 10,
+  showBrandCredits: true,
+};
+
+export const DEFAULT_RECEIPT_LAYOUT = {
+  header: {
+    storeNameAr: 'مسك وزعفران',
+    storeNameEn: 'Meska & Zafran',
+    tagline: 'للحلويات الملكية وقوالب الكيك الفاخرة',
+    phone: '0770 123 4567',
+    phone2: '0780 987 6543',
+    address: 'شارع الزهور - مقابل المجمع التجاري',
+    fontSize: 20,
+    bold: true,
+    align: 'center', // 'center' | 'right'
+    showTagline: true,
+    showPhones: true,
+    showAddress: true,
+    showStoreNameEn: true,
+  },
+  customer: {
+    fontSize: 15,
+    bold: true,
+    showPhone: true,
+    showAddress: true,
+    showPickupTime: true,
+    showWorker: true,
+  },
+  itemsTable: {
+    itemNameSize: 15,
+    itemNameBold: true,
+    itemPriceSize: 14,
+    itemPriceBold: true,
+    rowPadding: 'normal', // 'compact' | 'normal' | 'relaxed'
+    showDiscounts: true,
+  },
+  notesBlock: {
+    fontSize: 12,
+    bold: true,
+    showWrittenText: true,
+    showFlavor: true,
+    showDesign: true,
+    showChefNotes: true,
+  },
+  totalsBox: {
+    fontSize: 14,
+    bold: true,
+    align: 'left', // 'left' | 'between' | 'right'
+    borderStyle: 'solid', // 'solid' | 'double' | 'dashed' | 'none'
+    showSubtotal: true,
+    showDiscounts: true,
+  },
+  dividers: {
+    style: 'dashed', // 'dashed' | 'solid' | 'double' | 'none'
+  },
+  footer: {
+    noteText: 'شكراً لاختياركم مسك وزعفران | يسعدنا تقييمكم وزيارتكم مجدداً',
+    fontSize: 10,
+    showNote: true,
+    showBarcode: true,
+    showBrandCredits: true,
+  },
+};
+
 export const DEFAULT_STORE_SETTINGS = {
   storeNameAr: 'مسك وزعفران',
   storeNameEn: 'Meska & Zafran',
@@ -369,9 +607,29 @@ export const DEFAULT_STORE_SETTINGS = {
   managerPin: '1234', // Default Manager Profile Login PIN
   resetPin: '9999',   // Dedicated End-of-Day / Shift Reset PIN
   receiptFooterNote: 'شكراً لاختياركم مسك وزعفران | يسعدنا تقييمكم وزيارتكم مجدداً',
-  staffWhatsAppPhone: '',
+  logo: '/logo.png', // Default store logo
   allowSound: true,
   autoPrintReceiptOnPayment: true,
+  // Thermal Receipt Typography & Printhead Settings
+  receiptFontSize: 13,
+  receiptFontWeight: 'bold',
+  receiptHeaderScale: 2,
+  receiptHeaderSize: 20,
+  receiptHeaderBold: true,
+  receiptProductNameSize: 15,
+  receiptProductNameBold: true,
+  receiptNotesSize: 12,
+  receiptNotesBold: true,
+  receiptPriceSize: 14,
+  receiptPriceBold: true,
+  receiptGlobalWeight: '700',
+  receiptLineSpacing: 'normal',
+  // Dedicated Configurations for Each Receipt Type (Isolated)
+  salesReceiptConfig: { ...DEFAULT_SALES_RECEIPT_CONFIG },
+  reservationReceiptConfig: { ...DEFAULT_RESERVATION_RECEIPT_CONFIG },
+  kitchenTicketConfig: { ...DEFAULT_KITCHEN_TICKET_CONFIG },
+  // Granular Receipt Layout Schema (Backwards Compatible)
+  receiptLayout: { ...DEFAULT_RECEIPT_LAYOUT },
   // Shift Thresholds & Auto Switch Configuration
   morningShiftStart: '08:00',
   morningShiftEnd: '16:00',

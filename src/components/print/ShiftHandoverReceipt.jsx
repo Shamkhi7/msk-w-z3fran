@@ -1,9 +1,12 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
 import { ReceiptBrandingFooter } from './ReceiptBrandingFooter';
+import { getReceiptTypography } from '../../utils/receiptTypographyHelper';
 
 export function ShiftHandoverReceipt({ handoverData, storeSettings }) {
   if (!handoverData) return null;
+
+  const typo = getReceiptTypography(storeSettings);
 
   const formatDate = (isoString) => {
     if (!isoString) return '-';
@@ -12,7 +15,7 @@ export function ShiftHandoverReceipt({ handoverData, storeSettings }) {
   };
 
   const isMorning = handoverData.shiftType === 'صباحي';
-  const shiftLabel = isMorning ? 'الشفت الصباحي ☀️' : 'الشفت المسائي 🌙';
+  const shiftLabel = isMorning ? 'الشفت الصباحي' : 'الشفت المسائي';
 
   const directSales = Number(handoverData.directSales) || 0;
   const salesReturns = Number(handoverData.salesReturns) || 0;
@@ -24,15 +27,7 @@ export function ShiftHandoverReceipt({ handoverData, storeSettings }) {
   return (
     <div
       className="receipt-container text-black bg-white select-none font-bold"
-      style={{
-        color: '#000000',
-        width: '72.1mm',
-        maxWidth: '72.1mm',
-        margin: '0 auto',
-        padding: '2mm',
-        fontSize: '11px',
-        lineHeight: '1.25',
-      }}
+      style={typo.containerStyle}
     >
       {/* Header */}
       <div className="text-center pb-2 border-b-2 border-black">

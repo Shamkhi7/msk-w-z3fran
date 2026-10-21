@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CalendarDays,
   Plus,
@@ -22,6 +22,10 @@ import {
   Send,
   Copy,
   Camera,
+  Truck,
+  CreditCard,
+  Banknote,
+  X,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { ReservationFormModal } from './ReservationFormModal';
@@ -30,6 +34,9 @@ import { ManageReservationStaffModal } from './ManageReservationStaffModal';
 import { ManagerPinModal } from '../treasury/ManagerPinModal';
 import { formatPickupDateTime, getReservationDueStatus } from '../../utils/dateFormatter';
 import { sendReservationToStaffGroup, copyReservationToClipboard } from '../../utils/whatsappHelper';
+import { fetchIndexedDBReservations } from '../../utils/productAnalyticsHelper';
+
+const PAGE_SIZE = 24;
 
 export function ReservationsModule() {
   const {
@@ -46,13 +53,18 @@ export function ReservationsModule() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingReservation, setEditingReservation] = useState(null);
-  const [activeFilter, setActiveFilter] = useState('all'); // all, today, urgent, preparing, ready, delivered
+  const [activeFilter, setActiveFilter] = useState('today'); // Default: 'today' (حجوزات اليوم)
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [historicalReservations, setHistoricalReservations] = useState([]);
+  const [hasFetchedHistorical, setHasFetchedHistorical] = useState(false);
+  const [isFetchingHistorical, setIsFetchingHistorical] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); // { type: 'cancel', id } or { type: 'delete', reservation } or { type: 'manage_staff' }
   const [reservationToDelete, setReservationToDelete] = useState(null);
   const [receiptImageModalTarget, setReceiptImageModalTarget] = useState(null);
+  const [balanceCollectionTarget, setBalanceCollectionTarget] = useState(null); // { res, paymentMethod: 'نقداً' }
 
   const handleOpenWhatsApp = (phone, customerName, bookingNo, pickupDate, pickupTime, remainingBalance) => {
     if (!phone) return;
@@ -87,35 +99,89 @@ export function ReservationsModule() {
     }
   };
 
+  const loadHistoricalReservations = async () => {
+    if (hasFetchedHistorical || isFetchingHistorical) return;
+    setIsFetchingHistorical(true);
+    try {
+      const fetchPromise = fetchIndexedDBReservations();
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve([]), 3500));
+      const archived = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (Array.isArray(archived) && archived.length > 0) {
+        const existingIds = new Set((reservations || []).map((r) => r.id || r.receiptNumber));
+        const uniqueArchived = archived.filter((r) => r && (r.id || r.receiptNumber) && !existingIds.has(r.id || r.receiptNumber));
+        setHistoricalReservations(uniqueArchived);
+      }
+    } catch (err) {
+      console.warn('Failed to lazy load historical reservations:', err);
+    } finally {
+      setIsFetchingHistorical(false);
+      setHasFetchedHistorical(true);
+    }
+  };
+
+  useEffect(() => {
+    if (activeFilter === 'all' && !hasFetchedHistorical && !isFetchingHistorical) {
+      loadHistoricalReservations();
+    }
+  }, [activeFilter, hasFetchedHistorical, isFetchingHistorical]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [activeFilter, searchQuery]);
+
   const todayStr = new Date().toISOString().split('T')[0];
-  const urgentCount = reservations.filter((r) => getReservationDueStatus(r.pickupDate, r.pickupTime, r.status).isUrgent).length;
-  const todayCount = reservations.filter((r) => r.pickupDate === todayStr).length;
+  const urgentCount = (reservations || []).filter((r) => getReservationDueStatus(r.pickupDate, r.pickupTime, r.status).isUrgent).length;
+  const todayCount = (reservations || []).filter((r) => r.pickupDate === todayStr).length;
+  const deliveryCount = (reservations || []).filter((r) => r.isDelivery).length;
+  const preparingCount = (reservations || []).filter((r) => r.status === 'قيد التحضير').length;
+  const readyCount = (reservations || []).filter((r) => r.status === 'جاهز').length;
+  const deliveredCount = (reservations || []).filter((r) => r.status === 'تم التسليم').length;
 
-  const filteredReservations = reservations.filter((r) => {
+  const sourceReservations = useMemo(() => {
+    if (activeFilter !== 'all' || historicalReservations.length === 0) {
+      return reservations || [];
+    }
+    const existingIds = new Set((reservations || []).map((r) => r.id || r.receiptNumber));
+    const newHistory = historicalReservations.filter((r) => !existingIds.has(r.id || r.receiptNumber));
+    return [...(reservations || []), ...newHistory];
+  }, [reservations, historicalReservations, activeFilter]);
+
+  const filteredReservations = useMemo(() => {
+    const list = sourceReservations;
     const q = searchQuery.trim().toLowerCase();
-    const matchesSearch =
-      !q ||
-      r.customerName?.toLowerCase().includes(q) ||
-      r.phone?.includes(q) ||
-      r.receiptNumber?.toLowerCase().includes(q) ||
-      (r.workerName && r.workerName.toLowerCase().includes(q)) ||
-      (r.manualBookingNo && r.manualBookingNo.toLowerCase().includes(q)) ||
-      (r.writtenText && r.writtenText.toLowerCase().includes(q)) ||
-      (r.cakeMolds && r.cakeMolds.some((m) =>
-        m.writtenText?.toLowerCase().includes(q) ||
-        m.cakeFlavor?.toLowerCase().includes(q) ||
-        m.cakeDesign?.toLowerCase().includes(q)
-      ));
 
-    if (!matchesSearch) return false;
-    if (activeFilter === 'all') return true;
-    if (activeFilter === 'today') return r.pickupDate === todayStr;
-    if (activeFilter === 'urgent') return getReservationDueStatus(r.pickupDate, r.pickupTime, r.status).isUrgent;
-    if (activeFilter === 'preparing') return r.status === 'قيد التحضير';
-    if (activeFilter === 'ready') return r.status === 'جاهز';
-    if (activeFilter === 'delivered') return r.status === 'تم التسليم';
-    return true;
-  });
+    return list.filter((r) => {
+      const matchesSearch =
+        !q ||
+        r.customerName?.toLowerCase().includes(q) ||
+        r.phone?.includes(q) ||
+        r.receiptNumber?.toLowerCase().includes(q) ||
+        (r.workerName && r.workerName.toLowerCase().includes(q)) ||
+        (r.manualBookingNo && r.manualBookingNo.toLowerCase().includes(q)) ||
+        (r.writtenText && r.writtenText.toLowerCase().includes(q)) ||
+        (r.deliveryAddress && r.deliveryAddress.toLowerCase().includes(q)) ||
+        (r.cakeMolds && r.cakeMolds.some((m) =>
+          m.writtenText?.toLowerCase().includes(q) ||
+          m.cakeFlavor?.toLowerCase().includes(q) ||
+          m.cakeDesign?.toLowerCase().includes(q)
+        ));
+
+      if (!matchesSearch) return false;
+      if (activeFilter === 'all') return true;
+      if (activeFilter === 'delivery') return Boolean(r.isDelivery);
+      if (activeFilter === 'today') return r.pickupDate === todayStr;
+      if (activeFilter === 'urgent') return getReservationDueStatus(r.pickupDate, r.pickupTime, r.status).isUrgent;
+      if (activeFilter === 'preparing') return r.status === 'قيد التحضير';
+      if (activeFilter === 'ready') return r.status === 'جاهز';
+      if (activeFilter === 'delivered') return r.status === 'تم التسليم';
+      return true;
+    });
+  }, [sourceReservations, searchQuery, activeFilter, todayStr]);
+
+  const displayedReservations = useMemo(() => {
+    return filteredReservations.slice(0, visibleCount);
+  }, [filteredReservations, visibleCount]);
 
   const handleStatusChange = (resId, newStatus) => {
     if (newStatus === 'ملغي' && !isManager) {
@@ -199,7 +265,7 @@ export function ReservationsModule() {
               سجل حجوزات وطلبيات الكيك
             </h2>
             <p className="text-[11px] text-stone-500">
-              إجمالي الحجوزات المسجلة: {reservations.length} طلب
+              إجمالي الحجوزات المسجلة: {hasFetchedHistorical ? reservations.length + historicalReservations.length : reservations.length} طلب
             </p>
           </div>
         </div>
@@ -232,17 +298,27 @@ export function ReservationsModule() {
         {/* Status Filters */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           {[
-            { id: 'all', label: 'كافة الحجوزات', count: reservations.length },
-            { id: 'today', label: 'استلام اليوم', count: todayCount, badgeClass: 'bg-brand-900 text-white' },
-            {
+            { id: 'today', label: 'حجوزات اليوم', count: todayCount, badgeClass: 'bg-brand-900 text-white' },
+            { id: 'preparing', label: 'قيد التحضير', count: preparingCount > 0 ? preparingCount : null, badgeClass: 'bg-amber-700 text-white' },
+            { id: 'ready', label: 'جاهزة للتسليم', count: readyCount > 0 ? readyCount : null, badgeClass: 'bg-blue-700 text-white' },
+            { id: 'delivered', label: 'مكتملة / مستلمة', count: deliveredCount > 0 ? deliveredCount : null, badgeClass: 'bg-emerald-700 text-white' },
+            { id: 'delivery', label: '🛵 توصيل خارجي', count: deliveryCount > 0 ? deliveryCount : null, badgeClass: 'bg-indigo-600 text-white' },
+            ...(urgentCount > 0 ? [{
               id: 'urgent',
               label: 'عاجل ومتأخر ⚡',
-              count: urgentCount > 0 ? urgentCount : null,
+              count: urgentCount,
               badgeClass: 'bg-rose-600 text-white animate-pulse',
+            }] : []),
+            {
+              id: 'all',
+              label: 'كافة الحجوزات',
+              count: isFetchingHistorical
+                ? '...'
+                : hasFetchedHistorical
+                ? (reservations.length + historicalReservations.length)
+                : reservations.length,
+              badgeClass: 'bg-stone-600 text-white',
             },
-            { id: 'preparing', label: 'قيد التحضير' },
-            { id: 'ready', label: 'جاهز للتسليم' },
-            { id: 'delivered', label: 'تم التسليم' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -325,8 +401,15 @@ export function ReservationsModule() {
             <p className="font-bold text-stone-600">لا توجد حجوزات مطابقة للبحث أو الفلتر</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-            {filteredReservations.map((res) => {
+          <>
+            {isFetchingHistorical && (
+              <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-900 flex items-center justify-center gap-2 animate-pulse">
+                <Clock className="w-4 h-4 animate-spin" />
+                <span>جاري فحص وجلب الأرشيف التاريخي للحجوزات...</span>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+              {displayedReservations.map((res) => {
               const badge = getStatusBadge(res.status);
               const BadgeIcon = badge.icon;
               const isToday = res.pickupDate === todayStr;
@@ -368,6 +451,13 @@ export function ReservationsModule() {
                         <span className="font-mono font-bold text-xs text-stone-500">
                           {res.receiptNumber}
                         </span>
+                        {/* Delivery Badge */}
+                        {res.isDelivery && (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-600 text-white shadow-xs flex items-center gap-1 border border-blue-700">
+                            <Truck className="w-3 h-3" />
+                            <span>🛵 توصيل خارجي</span>
+                          </span>
+                        )}
                         {/* Mold Badge */}
                         {hasMold && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-stone-900 text-white">
@@ -396,6 +486,36 @@ export function ReservationsModule() {
                       <h4 className="font-black text-stone-800 text-base mt-1">
                         {res.customerName}
                       </h4>
+
+                      {/* Delivery Address Details Card (لمنع النسيان) */}
+                      {res.isDelivery && (
+                        <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-2.5 text-xs text-blue-950 font-bold space-y-1 mt-1.5 shadow-2xs">
+                          <div className="flex items-start gap-1.5 text-blue-900">
+                            <Truck className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="text-[10px] text-blue-600 block font-normal">عنوان التوصيل:</span>
+                              <span className="font-black text-xs">{res.deliveryAddress || 'لم يحدد عنوان'}</span>
+                            </div>
+                          </div>
+                          {res.deliveryPhone && res.deliveryPhone !== res.phone && (
+                            <div className="text-[11px] text-blue-800 pr-5">
+                              هاتف التوصيل: <span className="font-mono font-bold">{res.deliveryPhone}</span>
+                            </div>
+                          )}
+                          {res.deliveryNotes && (
+                            <div className="text-[10.5px] text-blue-700 italic pr-5">
+                              ملاحظات السائق: {res.deliveryNotes}
+                            </div>
+                          )}
+                          {Number(res.deliveryFee || 0) > 0 && (
+                            <div className="text-[11px] font-mono font-black text-blue-950 pr-5 pt-0.5 border-t border-blue-200 flex justify-between">
+                              <span>أجور التوصيل (للسائق):</span>
+                              <span>{Number(res.deliveryFee).toLocaleString()} {storeSettings.currency}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-3 text-xs text-stone-500 font-mono mt-0.5 flex-wrap">
                         <div className="flex items-center gap-1">
                           <Phone className="w-3.5 h-3.5 text-stone-400" />
@@ -569,9 +689,9 @@ export function ReservationsModule() {
 
                     {res.status !== 'تم التسليم' && res.remainingBalance > 0 && (
                       <button
-                        onClick={() => deliverReservationAndCollectBalance(res)}
-                        title="تسليم الكيك واستلام المتبقي في الصندوق"
-                        className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-all cursor-pointer"
+                        onClick={() => setBalanceCollectionTarget({ res, paymentMethod: 'نقداً' })}
+                        title="تسليم الكيك واستلام المتبقي وتحديد طريقة الدفع (كاش / بطاقة)"
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-all cursor-pointer shadow-xs"
                       >
                         <PackageCheck className="w-3.5 h-3.5" />
                         <span>تسليم واستلام ({res.remainingBalance.toLocaleString()})</span>
@@ -651,8 +771,34 @@ export function ReservationsModule() {
               );
             })}
           </div>
-        )}
-      </div>
+
+          {/* Pagination Controls */}
+          {filteredReservations.length > visibleCount && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-white border border-warm-200 rounded-2xl shadow-xs mt-4">
+              <div className="text-xs font-bold text-stone-600">
+                يتم عرض <span className="font-mono font-black text-brand-900">{displayedReservations.length}</span> من أصل <span className="font-mono font-black text-brand-900">{filteredReservations.length}</span> طلب
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, filteredReservations.length))}
+                  className="px-4 py-2 bg-brand-800 hover:bg-brand-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
+                >
+                  <span>تحميل المزيد (+{PAGE_SIZE})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount(filteredReservations.length)}
+                  className="px-3.5 py-2 bg-warm-100 hover:bg-warm-200 text-stone-700 rounded-xl text-xs font-bold transition-all border border-warm-300 cursor-pointer active:scale-95"
+                >
+                  <span>عرض الكل ({filteredReservations.length})</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
 
       <ReservationFormModal
         isOpen={isFormOpen}
@@ -789,6 +935,103 @@ export function ReservationsModule() {
           storeSettings={storeSettings}
           initialType="kitchen"
         />
+      )}
+
+      {/* Balance Collection & Payment Method Modal */}
+      {balanceCollectionTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in select-none">
+          <div className="bg-[#FAF8F5] border border-brand-900/20 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
+            <div className="bg-brand-800 text-white px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <PackageCheck className="w-5 h-5 text-gold-400" />
+                <h3 className="font-bold text-sm">تسليم الطلبية واستلام المتبقي</h3>
+              </div>
+              <button
+                onClick={() => setBalanceCollectionTarget(null)}
+                className="text-warm-200 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3.5">
+              <div className="bg-white p-3 rounded-xl border border-stone-200 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-stone-500 font-bold">الزبون:</span>
+                  <span className="font-black text-stone-900">{balanceCollectionTarget.res.customerName}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-stone-500 font-bold">رقم الحجز:</span>
+                  <span className="font-mono font-bold text-stone-700">{balanceCollectionTarget.res.receiptNumber}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm font-black border-t border-stone-200 pt-1.5 mt-1">
+                  <span className="text-rose-800 font-bold">المتبقي المطلوب:</span>
+                  <span className="font-mono text-base font-black text-rose-700">
+                    {Number(balanceCollectionTarget.res.remainingBalance || 0).toLocaleString()} {storeSettings.currency}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1.5">
+                  طريقة استلام المبلغ المتبقي:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBalanceCollectionTarget(prev => ({ ...prev, paymentMethod: 'نقداً' }))}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      balanceCollectionTarget.paymentMethod === 'نقداً'
+                        ? 'bg-emerald-700 text-white shadow-xs font-black'
+                        : 'bg-white text-stone-700 border border-stone-200 hover:bg-stone-100'
+                    }`}
+                  >
+                    <Banknote className="w-4 h-4" />
+                    <span>💵 نقدي (كاش)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBalanceCollectionTarget(prev => ({ ...prev, paymentMethod: 'بطاقة' }))}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      balanceCollectionTarget.paymentMethod === 'بطاقة'
+                        ? 'bg-blue-600 text-white shadow-xs font-black'
+                        : 'bg-white text-stone-700 border border-stone-200 hover:bg-stone-100'
+                    }`}
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>💳 بطاقة / إلكتروني</span>
+                  </button>
+                </div>
+                <div className="text-[10px] text-stone-500 mt-1.5 px-1">
+                  {balanceCollectionTarget.paymentMethod === 'بطاقة'
+                    ? '• لن يدخل هذا المبلغ في نقدية الصندوق (كاش)، وسيُدرج في مقبوضات الدفع الإلكتروني المعزولة'
+                    : '• سيُضاف هذا المبلغ مباشرة إلى كاش صندوق اليومية (صافي النقد)'}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-stone-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    deliverReservationAndCollectBalance(balanceCollectionTarget.res, balanceCollectionTarget.paymentMethod);
+                    setBalanceCollectionTarget(null);
+                  }}
+                  className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer"
+                >
+                  <PackageCheck className="w-4 h-4" />
+                  <span>تأكيد الاستلام وتسليم الطلب</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBalanceCollectionTarget(null)}
+                  className="px-3 bg-stone-200 hover:bg-stone-300 text-stone-700 text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

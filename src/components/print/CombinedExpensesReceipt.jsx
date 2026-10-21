@@ -1,11 +1,14 @@
 import React from 'react';
 import { numberToArabicWords } from '../../utils/arabicNumberToWords';
 import { ReceiptBrandingFooter } from './ReceiptBrandingFooter';
+import { getReceiptTypography } from '../../utils/receiptTypographyHelper';
 
 export function CombinedExpensesReceipt({ expenses, sessionMeta, storeSettings }) {
+  const typo = getReceiptTypography(storeSettings);
+
   if (!expenses || expenses.length === 0) {
     return (
-      <div className="receipt-container text-black bg-white text-center py-4 font-bold">
+      <div className="receipt-container text-black bg-white text-center py-4 font-bold" style={typo.containerStyle}>
         لا توجد صرفيات مسجلة لهذا اليوم.
       </div>
     );
@@ -25,7 +28,7 @@ export function CombinedExpensesReceipt({ expenses, sessionMeta, storeSettings }
   const totalAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
   return (
-    <div className="receipt-container text-black bg-white select-none font-bold" style={{ color: '#000' }}>
+    <div className="receipt-container text-black bg-white select-none font-bold" style={typo.containerStyle}>
       {/* Header */}
       <div className="text-center pb-2 border-b-2 border-black">
         <div className="text-base font-black tracking-wide text-black">{storeSettings.storeNameAr}</div>
